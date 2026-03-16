@@ -707,15 +707,14 @@ function guardar(){
   var yyyy = now2.getFullYear();
   var hh = now2.toTimeString().substring(0,8);
   var dateTimeStr = dd+'/'+mm+'/'+yyyy+' '+hh;
-  var dateObj  = new Date(date);
-  var year     = dateObj.getFullYear();
-  var m        = dateObj.getMonth() + 1;
-  var pm       = parseInt(month);
-  var payYear  = ((m===11||m===12)&&(pm===1||pm===2)) ? year+1 : year;
+  var dateObj = new Date(date);
+  var year    = dateObj.getFullYear();
+  var m       = dateObj.getMonth() + 1;
+  var pm      = parseInt(month);
+  var payYear = ((m===11||m===12)&&(pm===1||pm===2)) ? year+1 : year;
   var monthLbl = ['01. Enero','02. Febrero','03. Marzo','04. Abril','05. Mayo','06. Junio',
                   '07. Julio','08. Agosto','09. Setiembre','10. Octubre','11. Noviembre','12. Diciembre'][pm-1];
 
-  var dateTimeStr = date + ' ' + new Date().toTimeString().substring(0,8);
   var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType];
 
   apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:J:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
@@ -802,7 +801,16 @@ if(checkToken()){
 //  UI — igual que antes
 // ══════════════════════════════════════════════
 
-function fmt(n){ return isNaN(n)||n==null?'—':'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function parseDateFull(s){
+  // Convierte DD/MM/YYYY HH:MM:SS → YYYY/MM/DD HH:MM:SS para comparación
+  if(!s) return '';
+  var parts = s.split(' ');
+  var dateParts = parts[0].split('/');
+  if(dateParts.length === 3){
+    return dateParts[2]+'/'+dateParts[1]+'/'+dateParts[0]+(parts[1]?' '+parts[1]:'');
+  }
+  return s;
+}
 function fmtS(n){ if(!n) return 'S/ 0.00'; if(n>=1000) return 'S/'+(n/1000).toFixed(1).replace('.0','')+'k'; return 'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtAmt(el){ var v=el.value.replace(/[^0-9.,]/g,''); var p=v.split(/[.,]/); if(p.length>2)v=p[0]+'.'+p.slice(1).join(''); el.value=v; }
 function finalAmt(el){ var n=parseFloat(el.value.replace(',','.')); el.value=isNaN(n)?'':n.toFixed(2); }
@@ -932,9 +940,8 @@ function renderDash(){
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
   renderTxns('dTxns', exps.slice().sort(function(a,b){
-    // Ordenar por fecha completa descendente (incluye hora si existe)
-    var da = a.dateFull || a.date || '';
-    var db = b.dateFull || b.date || '';
+    var da = parseDateFull(a.dateFull || a.date || '');
+    var db = parseDateFull(b.dateFull || b.date || '');
     if(db !== da) return db.localeCompare(da);
     return b.id - a.id;
   }).slice(0,8));
