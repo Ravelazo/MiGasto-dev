@@ -305,9 +305,8 @@ input:focus,select:focus{border-color:var(--blue)}
 
 <header class="hdr">
   <div class="hdr-in">
-    <div class="logo"><div class="logo-ic">💙</div>MiGasto</div>
+    <div class="logo" onclick="goPage('dash')" style="cursor:pointer"><div class="logo-ic">💸</div>MiGasto</div>
     <div class="hdr-r">
-      <button class="zoom-btn" id="zoomBtn" onclick="cycleZoom()" title="Ajustar zoom">🔍 1×</button>
       <button class="db-btn" onclick="abrirSheet()">⬡ Ver datos</button>
       <div class="usr-ic" id="usrIc" title="Cerrar sesión" onclick="cerrarSesion()">?</div>
     </div>
@@ -346,8 +345,7 @@ input:focus,select:focus{border-color:var(--blue)}
   <div class="stats">
     <div class="sc"><div class="sc-lbl">Gasto total del mes</div><div class="sc-val" id="dTotal">—</div><div class="sc-note" id="dTrend"></div></div>
     <div class="sc"><div class="sc-lbl">Cantidad de gastos</div><div class="sc-val teal" id="dCount">—</div><div class="sc-note" style="color:var(--text3)">este mes</div></div>
-    <div class="sc"><div class="sc-lbl">Por pagar · <span id="dPendMes">—</span></div><div class="sc-val peach" id="dPend">—</div><div class="sc-note" id="dCorte" style="color:var(--text3);font-size:10.5px"></div></div>
-  </div>
+    <div class="sc"><div class="sc-lbl">Por pagar · <span id="dPendMes">—</span></div><div class="sc-val peach" id="dPend">—</div><div class="sc-note" id="dCorte" style="color:var(--text3);font-size:10.5px"></div></div>  </div>
   <div class="fv">
     <div class="fvc"><div class="fvc-lbl"><span class="fv-dot" style="background:var(--text3)"></span>Gastos fijos</div><div class="fvc-val" id="fvFVal" style="color:var(--text2)">—</div><div class="fvc-pct" id="fvFPct">—</div><div class="fv-bar"><div class="fv-fill" id="fvFBar" style="background:var(--border2)"></div></div></div>
     <div class="fvc"><div class="fvc-lbl"><span class="fv-dot" style="background:var(--blue)"></span>Gastos variables</div><div class="fvc-val" id="fvVVal" style="color:var(--blue)">—</div><div class="fvc-pct" id="fvVPct">—</div><div class="fv-bar"><div class="fv-fill" id="fvVBar" style="background:var(--blue)"></div></div></div>
@@ -388,8 +386,8 @@ input:focus,select:focus{border-color:var(--blue)}
     <div class="fc">
       <div class="fc-ttl" style="font-size:15px;margin-bottom:14px">Tarjetas</div>
       <div class="cfg-list" id="cfgCards"></div>
-      <div class="add-row"><input id="newCard" type="text" placeholder="Nombre tarjeta..."><input id="newCutoff" type="number" min="1" max="31" placeholder="Día corte" style="max-width:110px"><button class="add-btn" onclick="addCard()">+</button></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">El día de corte es cuando cierra tu resumen mensual</div>
+      <div class="add-row"><input id="newCard" type="text" placeholder="Nombre tarjeta..."><input id="newCutoff" type="number" min="1" max="31" placeholder="Día pago" style="max-width:110px"><button class="add-btn" onclick="addCard()">+</button></div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px">El día de pago es cuando vence tu resumen mensual</div>
     </div>
     <div class="fc">
       <div class="fc-ttl" style="font-size:15px;margin-bottom:14px">Personas</div>
@@ -434,7 +432,7 @@ input:focus,select:focus{border-color:var(--blue)}
 </div><!-- /appScreen -->
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.0</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -611,9 +609,11 @@ function readGastos(){
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
-        var payMonthRaw = r[6] || '';
-        var pm = payMonthRaw.substring(0, 2).replace(/\D/g,'');
-        if(!pm) pm = '01';
+        var payMonthRaw = String(r[6] || '').trim();
+        // Soporta "03. Marzo", "3. Marzo", "03", "3", número puro
+        var pm = payMonthRaw.replace(/\D.*$/,'').replace(/^0+/,'') || '';
+        if(!pm) pm = '1';
+        pm = String(parseInt(pm)).padStart(2,'0');
         return {
           id: i+1,
           date:     r[0] ? r[0].substring(0,10) : '',
@@ -622,7 +622,7 @@ function readGastos(){
           store:    r[3] || '',
           detail:   r[4] || '',
           amount:   parseFloat(r[5]) || 0,
-          payMonth: pm.padStart(2,'0'),
+          payMonth: pm,
           payYear:  parseInt(r[8]) || now.getFullYear(),
           type:     r[9] || 'variable'
         };
@@ -655,6 +655,14 @@ function getUserInfo(){
 }
 
 // ── GUARDAR GASTO ────────────────────────────────────────
+function highlightError(id){
+  var el=document.getElementById(id);
+  if(!el)return;
+  el.style.borderColor='var(--peach)';
+  el.style.boxShadow='0 0 0 3px rgba(245,135,106,.15)';
+  setTimeout(function(){el.style.borderColor='';el.style.boxShadow='';},2000);
+}
+
 function guardar(){
   var card   = document.getElementById('fCard').value;
   var person = document.getElementById('fPerson').value;
@@ -663,11 +671,14 @@ function guardar(){
   var detail = document.getElementById('fDetail').value.trim();
   var month  = document.getElementById('fMonth').value;
   var date   = document.getElementById('fDate').value;
-  if(!card){toast('Selecciona una tarjeta');return;}
-  if(!person){toast('Selecciona una persona');return;}
-  if(!amount||isNaN(amount)){toast('Ingresa un monto válido');return;}
-  if(!store){toast('Escribe la tienda o lugar');return;}
-  if(!date){toast('Selecciona la fecha');return;}
+
+  var ok = true;
+  if(!card){highlightError('fCard');toast('⚠️ Selecciona una tarjeta');ok=false;}
+  else if(!person){highlightError('fPerson');toast('⚠️ Selecciona una persona');ok=false;}
+  else if(!amount||isNaN(amount)){highlightError('fAmount');toast('⚠️ Ingresa un monto válido');ok=false;}
+  else if(!store){highlightError('fStore');toast('⚠️ Escribe la tienda o lugar');ok=false;}
+  else if(!date){highlightError('fDate');toast('⚠️ Selecciona la fecha');ok=false;}
+  if(!ok) return;
 
   var btn = document.getElementById('saveBtn');
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -692,13 +703,16 @@ function guardar(){
     }
   }).then(function(){
     btn.disabled = false; btn.textContent = 'Guardar gasto';
+    document.getElementById('fCard').value   = '';
+    document.getElementById('fPerson').value = '';
     document.getElementById('fAmount').value = '';
     document.getElementById('fStore').value  = '';
     document.getElementById('fDetail').value = '';
     setType('variable');
-    toast('✓ Gasto guardado');
+    // Resetear fecha al día de hoy
+    document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
+    toast('✓ Gasto guardado — puedes registrar otro');
     cargarDatos();
-    setTimeout(function(){ goPage('dash'); }, 400);
   }).catch(function(err){
     btn.disabled = false; btn.textContent = 'Guardar gasto';
     toast('Error al guardar');
@@ -764,7 +778,7 @@ if(checkToken()){
 // ══════════════════════════════════════════════
 
 function fmt(n){ return isNaN(n)||n==null?'—':'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
-function fmtS(n){ return !n?'S/0':n>=1000?'S/'+(n/1000).toFixed(1).replace('.0','')+'k':'S/'+Math.round(n); }
+function fmtS(n){ if(!n) return 'S/ 0.00'; if(n>=1000) return 'S/'+(n/1000).toFixed(1).replace('.0','')+'k'; return 'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtAmt(el){ var v=el.value.replace(/[^0-9.,]/g,''); var p=v.split(/[.,]/); if(p.length>2)v=p[0]+'.'+p.slice(1).join(''); el.value=v; }
 function finalAmt(el){ var n=parseFloat(el.value.replace(',','.')); el.value=isNaN(n)?'':n.toFixed(2); }
 function emoji(n){
@@ -818,7 +832,7 @@ function refreshAll(){
 function renderCfgList(id,arr,fn,extras){
   var el=document.getElementById(id);
   el.innerHTML=arr.map(function(v,i){
-    var extra=extras&&extras[i]?'<span style="font-size:11px;color:var(--text3);margin-left:6px">corte día '+extras[i]+'</span>':'';
+    var extra=extras&&extras[i]?'<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>':'';
     return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div><button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button></div>';
   }).join('');
 }
@@ -880,7 +894,7 @@ function renderDash(){
   document.getElementById('dPend').textContent=fmt(prev);
   document.getElementById('dPendMes').textContent=MN[pm-1];
   var corteEl=document.getElementById('dCorte'),corteItems=[];
-  S.cards.forEach(function(c,i){var d=S.cutoffs[i];if(!d)return;if(cFilter==='all')corteItems.push(c+' · día '+d);else if(c===cFilter)corteItems.push('Corte día '+d);});
+  S.cards.forEach(function(c,i){var d=S.cutoffs[i];if(!d)return;if(cFilter==='all')corteItems.push(c+' · pago día '+d);else if(c===cFilter)corteItems.push('Pago día '+d);});
   if(corteItems.length){corteEl.innerHTML=corteItems.join(' · ');corteEl.style.display='block';}else{corteEl.textContent='';corteEl.style.display='none';}
   var fx=exps.filter(function(e){return e.type==='fixed';}).reduce(function(s,e){return s+e.amount;},0);
   var vr=exps.filter(function(e){return e.type==='variable';}).reduce(function(s,e){return s+e.amount;},0);
@@ -892,7 +906,7 @@ function renderDash(){
   renderDonut('svgCard','dlCard','dnCard',byCard,fmtS(total));
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
-  renderTxns('dTxns',exps.slice(0,8));
+  renderTxns('dTxns', exps.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).slice(0,8));
 }
 
 function renderBars(curM,curY,cardF){
