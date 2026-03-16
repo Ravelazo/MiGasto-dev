@@ -46,7 +46,43 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .db-btn:hover{color:var(--text2);background:var(--surface2)}
 .zoom-btn{font-size:12px;font-weight:600;color:var(--text3);border:1px solid var(--border);background:var(--surface);border-radius:8px;padding:5px 9px;cursor:pointer;font-family:var(--font);transition:all .15s}
 .zoom-btn:hover{background:var(--surface2)}
-.usr-ic{width:30px;height:30px;border-radius:50%;background:var(--blue-bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--blue);cursor:pointer}
+.usr-ic{width:30px;height:30px;border-radius:50%;background:var(--blue-bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--blue);cursor:pointer;position:relative}
+
+/* ── AVATAR DROPDOWN ── */
+.usr-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(29,34,51,.12);min-width:200px;z-index:300;overflow:hidden;display:none}
+.usr-menu.open{display:block}
+.usr-menu-item{display:flex;align-items:center;gap:10px;padding:13px 16px;font-size:14px;font-weight:500;font-family:var(--font);color:var(--text2);cursor:pointer;border:none;background:none;width:100%;text-align:left;border-bottom:1px solid var(--border);transition:background .12s}
+.usr-menu-item:last-child{border-bottom:none}
+.usr-menu-item:hover{background:var(--surface2)}
+.usr-menu-item.danger{color:var(--peach)}
+.usr-menu-ic{font-size:16px;width:20px;text-align:center}
+
+/* ── FAQ MODAL ── */
+.faq-ov{position:fixed;inset:0;background:rgba(29,34,51,.5);z-index:500;display:flex;align-items:flex-end;animation:fadeIn .2s}
+.faq-sheet{background:var(--surface);border-radius:24px 24px 0 0;padding:20px 20px 40px;max-height:85vh;overflow-y:auto;width:100%}
+.faq-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
+.faq-ttl{font-size:18px;font-weight:700}
+.faq-close{background:var(--surface2);border:none;border-radius:50%;width:30px;height:30px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font);color:var(--text2)}
+.faq-item{border:1px solid var(--border);border-radius:12px;margin-bottom:8px;overflow:hidden}
+.faq-q{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;cursor:pointer;font-size:14px;font-weight:600;background:var(--surface);border:none;width:100%;text-align:left;font-family:var(--font);color:var(--text);gap:10px}
+.faq-q:hover{background:var(--surface2)}
+.faq-chevron{font-size:11px;color:var(--text3);transition:transform .2s;flex-shrink:0}
+.faq-item.open .faq-chevron{transform:rotate(180deg)}
+.faq-a{display:none;padding:0 16px 14px;font-size:13.5px;color:var(--text2);line-height:1.6}
+.faq-item.open .faq-a{display:block}
+.faq-a strong{color:var(--text);font-weight:600}
+
+/* ── CONFIG PAGE ── */
+.cfg-salary{background:var(--surface);border-radius:var(--r);padding:20px;border:1px solid var(--border);box-shadow:var(--sh);margin-bottom:14px}
+.cfg-salary-ttl{font-size:15px;font-weight:700;margin-bottom:6px}
+.cfg-salary-sub{font-size:12px;color:var(--text3);margin-bottom:14px}
+
+/* ── SALARY CARD ── */
+.sc-salary{background:var(--surface);border-radius:var(--r);padding:18px 16px;border:1px solid var(--border);box-shadow:var(--sh);position:relative;overflow:hidden;margin-bottom:16px}
+.sc-salary::before{content:'';position:absolute;inset:0;border-radius:var(--r);opacity:.04;background:var(--green)}
+.sc-salary-lbl{font-size:11.5px;font-weight:500;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sc-salary-val{font-size:32px;font-weight:700;letter-spacing:-.8px;line-height:1;color:var(--green)}
+.sc-salary-total{font-size:12px;color:var(--text3);margin-top:6px}
 
 /* ── SELECTOR DE SECCIÓN ── */
 .sec-selector{position:sticky;top:3.5rem;z-index:185;background:var(--bg);padding:8px 16px;border-bottom:1px solid var(--border)}
@@ -308,7 +344,13 @@ input:focus,select:focus{border-color:var(--blue)}
     <div class="logo" onclick="goPage('dash')" style="cursor:pointer"><div class="logo-ic">💸</div>MiGasto</div>
     <div class="hdr-r">
       <button class="db-btn" onclick="abrirSheet()">⬡ Ver datos</button>
-      <div class="usr-ic" id="usrIc" title="Cerrar sesión" onclick="cerrarSesion()">?</div>
+      <div class="usr-ic" id="usrIc" onclick="toggleUsrMenu()">?
+        <div class="usr-menu" id="usrMenu">
+          <button class="usr-menu-item" onclick="abrirFaq()"><span class="usr-menu-ic">❓</span>Ayuda / FAQ</button>
+          <button class="usr-menu-item" onclick="instalarPWA()"><span class="usr-menu-ic">📲</span>Crear acceso directo</button>
+          <button class="usr-menu-item danger" onclick="cerrarSesion()"><span class="usr-menu-ic">👋</span>Cerrar sesión</button>
+        </div>
+      </div>
     </div>
   </div>
 </header>
@@ -326,6 +368,7 @@ input:focus,select:focus{border-color:var(--blue)}
     <button class="sec-opt"   id="so-reg"     onclick="selectSec('reg','✏️ Registrar')">✏️ Registrar</button>
     <button class="sec-opt"   id="so-anual"   onclick="selectSec('anual','📅 Anual')">📅 Anual</button>
     <button class="sec-opt"   id="so-tiendas" onclick="selectSec('tiendas','🏪 Tiendas')">🏪 Tiendas</button>
+    <button class="sec-opt"   id="so-cfg"     onclick="selectSec('cfg','⚙️ Configuración')">⚙️ Configuración</button>
     <button class="sec-opt nuevo" onclick="selectSec('reg','✏️ Registrar')">＋ Nuevo gasto</button>
   </div>
 </div>
@@ -342,6 +385,11 @@ input:focus,select:focus{border-color:var(--blue)}
     </div>
   </div>
   <div class="chips" id="chips"></div>
+  <div id="salaryCard" style="display:none" class="sc-salary">
+    <div class="sc-salary-lbl">Disponible este mes</div>
+    <div class="sc-salary-val" id="salaryDisp">—</div>
+    <div class="sc-salary-total" id="salaryTotal">—</div>
+  </div>
   <div class="stats">
     <div class="sc"><div class="sc-lbl">Gasto total del mes</div><div class="sc-val" id="dTotal">—</div><div class="sc-note" id="dTrend"></div></div>
     <div class="sc"><div class="sc-lbl">Cantidad de gastos</div><div class="sc-val teal" id="dCount">—</div><div class="sc-note" style="color:var(--text3)">este mes</div></div>
@@ -367,9 +415,9 @@ input:focus,select:focus{border-color:var(--blue)}
 <div id="pg-reg" class="pg">
   <div class="fc">
     <div class="fc-ttl">Nuevo gasto</div>
-    <div class="fg"><label>Tarjeta</label><select id="fCard"></select></div>
+    <div class="fg"><label>Tarjeta <button onclick="selectSec('cfg','⚙️ Configuración');closeSecMenu()" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;margin-left:4px">+ Agregar / Editar</button></label><select id="fCard"></select></div>
     <div class="row2">
-      <div class="fg"><label>Persona</label><select id="fPerson"></select></div>
+      <div class="fg"><label>Persona <button onclick="selectSec('cfg','⚙️ Configuración');closeSecMenu()" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;margin-left:4px">+ Agregar / Editar</button></label><select id="fPerson"></select></div>
       <div class="fg"><label>Monto (S/)</label><div class="amt-w"><span class="amt-pre">S/</span><input id="fAmount" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtAmt(this)" onblur="finalAmt(this)"></div></div>
     </div>
     <div class="fg"><label>Tienda / Lugar</label><div class="ac-w"><input id="fStore" type="text" placeholder="Ej: Plaza Vea, Netflix..." oninput="acIn(this)" onblur="acBlur()" autocomplete="off"><div class="ac-list" id="acList" style="display:none"></div></div></div>
@@ -428,8 +476,59 @@ input:focus,select:focus{border-color:var(--blue)}
   <div class="stores-c"><div class="sh2-t" style="margin-bottom:16px">Top tiendas por monto</div><div id="storeList"></div></div>
 </div>
 
+<!-- CONFIGURACIÓN -->
+<div id="pg-cfg" class="pg">
+  <div class="mbar"><div><span class="mtitle">Configuración</span></div></div>
+
+  <!-- Tarjetas -->
+  <div class="fc">
+    <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">💳 Tarjetas</div>
+    <div class="cfg-list" id="cfgCards2"></div>
+    <div class="add-row">
+      <input id="newCard2" type="text" placeholder="Nombre tarjeta...">
+      <input id="newCutoff2" type="number" min="1" max="31" placeholder="Día pago" style="max-width:110px">
+      <button class="add-btn" onclick="addCard2()">+</button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-top:6px">El día de pago es cuando vence tu resumen mensual</div>
+  </div>
+
+  <!-- Personas -->
+  <div class="fc">
+    <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">👤 Personas</div>
+    <div class="cfg-list" id="cfgPersons2"></div>
+    <div class="add-row">
+      <input id="newPerson2" type="text" placeholder="Ej: Sofía...">
+      <button class="add-btn" onclick="addPerson2()">+</button>
+    </div>
+  </div>
+
+  <!-- Sueldo -->
+  <div class="cfg-salary">
+    <div class="cfg-salary-ttl">💰 Sueldo disponible</div>
+    <div class="cfg-salary-sub">Se usa para mostrar cuánto te queda disponible en el dashboard</div>
+    <div class="fg" style="margin-bottom:0">
+      <div class="amt-w">
+        <span class="amt-pre">S/</span>
+        <input id="salaryInput" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtAmt(this)" onblur="finalAmt(this)">
+      </div>
+    </div>
+    <button class="save-btn" style="margin-top:12px" onclick="saveSalary()">Guardar sueldo</button>
+  </div>
+</div>
+
 </main>
 </div><!-- /appScreen -->
+
+<!-- FAQ MODAL -->
+<div class="faq-ov" id="faqOv" style="display:none" onclick="closeFaqIfOv(event)">
+  <div class="faq-sheet">
+    <div class="faq-hd">
+      <div class="faq-ttl">❓ Ayuda — MiGasto</div>
+      <button class="faq-close" onclick="cerrarFaq()">×</button>
+    </div>
+    <div id="faqItems"></div>
+  </div>
+</div>
 
 <div class="toast" id="toastEl"></div>
 <div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1</div>
@@ -598,6 +697,9 @@ function getOrCreateSheet(){
           return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Config!A1:D1?valueInputOption=RAW', {
             values: [['tarjetas','personas','tiendas','corte']]
           });
+        }).then(function(){
+          // Config con valores por defecto
+          return setDefaultConfig(id);
         }).then(function(){ return id; });
       });
     });
@@ -786,6 +888,7 @@ function cargarDatos(){
 }
 
 function initApp(){
+  loadSalary();
   document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
   var sel = document.getElementById('fMonth');
   var m = String(now.getMonth()+1).padStart(2,'0');
@@ -918,7 +1021,8 @@ function goPage(id){
   window.scrollTo({top:0,behavior:'smooth'});
   if(id==='anual') renderAnnual();
   if(id==='tiendas') renderStores();
-  var labels={dash:'🏠 Inicio',reg:'✏️ Registrar',anual:'📅 Anual',tiendas:'🏪 Tiendas'};
+  if(id==='cfg') renderCfgPage();
+  var labels={dash:'🏠 Inicio',reg:'✏️ Registrar',anual:'📅 Anual',tiendas:'🏪 Tiendas',cfg:'⚙️ Configuración'};
   var lbl=document.getElementById('secLabel');
   if(lbl&&labels[id]) lbl.textContent=labels[id];
   document.querySelectorAll('.sec-opt').forEach(function(o){o.classList.remove('on');});
@@ -956,6 +1060,17 @@ function renderDash(){
   var fp=total?Math.round(fx/total*100):0,vp=total?Math.round(vr/total*100):0;
   document.getElementById('fvFVal').textContent=fmt(fx);document.getElementById('fvFPct').textContent=fp+'% del total';document.getElementById('fvFBar').style.width=fp+'%';
   document.getElementById('fvVVal').textContent=fmt(vr);document.getElementById('fvVPct').textContent=vp+'% del total';document.getElementById('fvVBar').style.width=vp+'%';
+  // Salary card
+  var salaryCard = document.getElementById('salaryCard');
+  if(S.salary && S.salary > 0){
+    var disponible = S.salary - total;
+    document.getElementById('salaryDisp').textContent = fmt(disponible);
+    document.getElementById('salaryTotal').textContent = 'De un sueldo de ' + fmt(S.salary);
+    document.getElementById('salaryDisp').style.color = disponible >= 0 ? 'var(--green)' : 'var(--peach)';
+    salaryCard.style.display = 'block';
+  } else {
+    salaryCard.style.display = 'none';
+  }
   renderBars(m,y,cFilter);
   var byCard={};exps.forEach(function(e){byCard[e.card]=(byCard[e.card]||0)+e.amount;});
   renderDonut('svgCard','dlCard','dnCard',byCard,fmtS(total));
@@ -1098,7 +1213,154 @@ function selectSec(id,label){
   var so=document.getElementById('so-'+id);if(so)so.classList.add('on');
   goPage(id);closeSecMenu();
 }
-document.addEventListener('click',function(e){ var sel=document.querySelector('.sec-selector');if(sel&&!sel.contains(e.target))sel.classList.remove('open'); });
+document.addEventListener('click',function(e){
+  var sel=document.querySelector('.sec-selector');
+  if(sel&&!sel.contains(e.target))sel.classList.remove('open');
+  // Cerrar menú avatar si clic fuera
+  var usrMenu=document.getElementById('usrMenu');
+  var usrIc=document.getElementById('usrIc');
+  if(usrMenu&&usrIc&&!usrIc.contains(e.target))usrMenu.classList.remove('open');
+});
+
+// ── AVATAR MENU ──────────────────────────────────────────
+function toggleUsrMenu(e){
+  if(e) e.stopPropagation();
+  document.getElementById('usrMenu').classList.toggle('open');
+}
+
+// ── PWA / ACCESO DIRECTO ─────────────────────────────────
+var pwaPrompt = null;
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault();
+  pwaPrompt = e;
+});
+function instalarPWA(){
+  document.getElementById('usrMenu').classList.remove('open');
+  if(pwaPrompt){
+    pwaPrompt.prompt();
+    pwaPrompt.userChoice.then(function(){ pwaPrompt = null; });
+  } else {
+    // Instrucciones manuales según navegador
+    var ua = navigator.userAgent;
+    var msg = '';
+    if(/iPhone|iPad/.test(ua)){
+      msg = 'En Safari: toca el botón compartir (⬆) y luego "Agregar a pantalla de inicio"';
+    } else if(/Android/.test(ua)){
+      msg = 'En Chrome: toca el menú (⋮) y luego "Agregar a pantalla de inicio"';
+    } else {
+      msg = 'En Chrome: clic en el ícono ⊕ en la barra de direcciones para instalar';
+    }
+    toast(msg);
+  }
+}
+
+// ── FAQ ───────────────────────────────────────────────────
+var FAQ_DATA = [
+  { q: '📊 ¿Qué veo en Inicio?',
+    a: 'El dashboard del mes actual. Muestra tu <strong>gasto total</strong>, cuántos gastos hiciste, y cuánto tienes "por pagar" del mes anterior. También ves un gráfico de los últimos 6 meses y tus gastos recientes. Usa las flechas ‹ › para navegar entre meses.' },
+  { q: '✏️ ¿Cómo registro un gasto?',
+    a: 'Toca <strong>＋ Nuevo</strong> en la barra de navegación. Llena todos los campos: tarjeta, persona, monto, tienda, mes de pago y fecha. El tipo de gasto (Fijo o Variable) se selecciona al final. Toca <strong>Guardar gasto</strong> — el formulario se limpia para que puedas registrar otro.' },
+  { q: '💳 ¿Cómo agrego tarjetas y personas?',
+    a: 'Ve a <strong>⚙️ Configuración</strong> desde el menú. Ahí puedes agregar, editar o eliminar tarjetas (con su día de pago) y personas. También puedes llegar desde el formulario tocando "+ Agregar / Editar" junto a los campos Tarjeta o Persona.' },
+  { q: '💰 ¿Para qué sirve el sueldo?',
+    a: 'En <strong>Configuración</strong> puedes ingresar tu sueldo disponible del mes. Con eso, el dashboard muestra automáticamente cuánto te queda disponible descontando lo que ya comprometiste en gastos del mes.' },
+  { q: '📅 ¿Qué es la vista Anual?',
+    a: 'Muestra un resumen de todos los meses del año. Puedes navegar entre años con las flechas. Al tocar un mes ves el detalle de todos sus gastos ordenados por monto.' },
+  { q: '🏪 ¿Qué muestra la sección Tiendas?',
+    a: 'Un ranking de dónde más gastas. Puedes filtrar por el <strong>último mes, 3 meses o 6 meses</strong>. Arriba ves los gastos más recurrentes y abajo el top por monto total.' },
+  { q: '🔒 ¿Mis datos están seguros?',
+    a: 'Sí. Todos tus datos se guardan en <strong>tu propio Google Drive</strong>, en un archivo llamado "MiGasto — Registro de Gastos". Ni el desarrollador ni nadie más puede ver tus datos. Si dejas de usar la app, tu archivo sigue en tu Drive.' },
+  { q: '📊 ¿Puedo ver mis datos en Excel?',
+    a: 'Sí. Toca el botón <strong>"⬡ Ver datos"</strong> en la cabecera — te lleva directo a tu Google Sheet donde puedes ver, filtrar o exportar todos tus gastos.' },
+];
+
+function abrirFaq(){
+  document.getElementById('usrMenu').classList.remove('open');
+  var el = document.getElementById('faqItems');
+  el.innerHTML = FAQ_DATA.map(function(f,i){
+    return '<div class="faq-item" id="faq-'+i+'">'
+      +'<button class="faq-q" onclick="toggleFaq('+i+')">'
+      +'<span>'+f.q+'</span><span class="faq-chevron">▾</span></button>'
+      +'<div class="faq-a">'+f.a+'</div></div>';
+  }).join('');
+  document.getElementById('faqOv').style.display = 'flex';
+}
+function cerrarFaq(){
+  document.getElementById('faqOv').style.display = 'none';
+}
+function closeFaqIfOv(e){
+  if(e.target === document.getElementById('faqOv')) cerrarFaq();
+}
+function toggleFaq(i){
+  var item = document.getElementById('faq-'+i);
+  item.classList.toggle('open');
+}
+
+// ── CONFIG PAGE ───────────────────────────────────────────
+function renderCfgPage(){
+  renderCfgList2('cfgCards2', S.cards, removeCard2, S.cutoffs);
+  renderCfgList2('cfgPersons2', S.persons, removePerson2, null);
+  // Sueldo
+  if(S.salary) document.getElementById('salaryInput').value = S.salary.toFixed(2);
+}
+
+function renderCfgList2(id, arr, fn, extras){
+  var el = document.getElementById(id);
+  if(!el) return;
+  el.innerHTML = arr.map(function(v,i){
+    var extra = extras&&extras[i] ? '<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>' : '';
+    return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
+      +'<button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button></div>';
+  }).join('');
+}
+
+function addCard2(){
+  var ni=document.getElementById('newCard2'), nc=document.getElementById('newCutoff2');
+  var v=ni.value.trim(), c=parseInt(nc.value)||'';
+  if(!v) return;
+  if(S.cards.indexOf(v)>=0){toast('Esa tarjeta ya existe');return;}
+  S.cards.push(v); S.cutoffs.push(c);
+  ni.value=''; nc.value='';
+  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+v+'" agregada ✓');
+}
+function removeCard2(i){
+  var nm=S.cards[i]; S.cards.splice(i,1); S.cutoffs.splice(i,1);
+  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+nm+'" eliminada');
+}
+function addPerson2(){
+  var ni=document.getElementById('newPerson2'), v=ni.value.trim();
+  if(!v) return;
+  if(S.persons.indexOf(v)>=0){toast('Esa persona ya existe');return;}
+  S.persons.push(v); ni.value='';
+  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+v+'" agregada ✓');
+}
+function removePerson2(i){
+  var nm=S.persons[i]; S.persons.splice(i,1);
+  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+nm+'" eliminada');
+}
+
+// ── SUELDO ────────────────────────────────────────────────
+function saveSalary(){
+  var v = parseFloat(document.getElementById('salaryInput').value.replace(',','.'));
+  if(!v||isNaN(v)){toast('Ingresa un monto válido');return;}
+  S.salary = v;
+  localStorage.setItem('mg_salary', String(v));
+  renderDash();
+  toast('✓ Sueldo guardado');
+}
+
+function loadSalary(){
+  var saved = localStorage.getItem('mg_salary');
+  if(saved) S.salary = parseFloat(saved) || 0;
+}
+
+// ── TARJETA DEFAULT EN CUENTA NUEVA ──────────────────────
+// (se llama desde getOrCreateSheet al crear el Sheet por primera vez)
+function setDefaultConfig(id){
+  return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Config!A2:D2?valueInputOption=RAW', {
+    values: [['Tarjeta 1', S.userName||'Usuario', '', '']]
+  });
+}
 </script>
 </body>
 </html>
