@@ -609,23 +609,26 @@ function readGastos(){
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
-        // Fecha: DD/MM/YYYY HH:MM:SS (texto) o número serial de Sheets
+        // Fecha: serial numérico o string DD/MM/YYYY HH:MM:SS
         var rawDate = r[0];
-        var dateStr = '';
+        var dateStr = '', dateFull = '';
         if(rawDate){
           if(typeof rawDate === 'number'){
-            // Serial de Sheets → convertir a YYYY-MM-DD
+            // Serial de Sheets (incluye hora como fracción decimal)
             var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
-            dateStr = d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+            dateStr  = d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
+            dateFull = dateStr+' '+String(d.getUTCHours()).padStart(2,'0')+':'+String(d.getUTCMinutes()).padStart(2,'0')+':'+String(d.getUTCSeconds()).padStart(2,'0');
           } else {
             var s = String(rawDate).trim();
-            var parts = s.split(' ')[0].split('/');
+            var timePart = s.indexOf(' ') > 0 ? s.split(' ').slice(1).join(' ').replace(/\s/g,'') : '00:00:00';
+            var datePart = s.split(' ')[0];
+            var parts = datePart.split('/');
             if(parts.length === 3){
-              // DD/MM/YYYY HH:MM:SS
               dateStr = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
             } else {
-              dateStr = s.substring(0,10);
+              dateStr = datePart.substring(0,10);
             }
+            dateFull = dateStr + ' ' + timePart;
           }
         }
         // Mes de pago: soporta "03. Marzo", "3", número puro
@@ -642,7 +645,7 @@ function readGastos(){
         return {
           id:       i+1,
           date:     dateStr,
-          dateFull: rawDate ? String(rawDate).trim() : dateStr,
+          dateFull: dateFull || dateStr,
           card:     r[1] || '',          person:   r[2] || '',
           store:    r[3] || '',
           detail:   r[4] || '',
@@ -959,8 +962,8 @@ function renderDash(){
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
   renderTxns('dTxns', exps.slice().sort(function(a,b){
-    var da = parseDateFull(a.dateFull || a.date || '');
-    var db = parseDateFull(b.dateFull || b.date || '');
+    var da = a.dateFull || a.date || '';
+    var db = b.dateFull || b.date || '';
     if(db !== da) return db.localeCompare(da);
     return b.id - a.id;
   }).slice(0,8));
