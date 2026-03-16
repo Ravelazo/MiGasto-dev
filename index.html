@@ -827,7 +827,19 @@ function emoji(n){
   return '📌';
 }
 function cardTag(c){ return TCOLS[S.cards.indexOf(c)%TCOLS.length]||'tag-b'; }
-function fmtDs(d){ if(!d)return''; var p=d.split('-'); return p[2]+' '+MS[parseInt(p[1])-1]; }
+function fmtDs(d){
+  if(!d) return '';
+  if(d.indexOf('-') >= 0){
+    // YYYY-MM-DD
+    var p = d.split('-');
+    return p[2]+' '+MS[parseInt(p[1])-1];
+  } else if(d.indexOf('/') >= 0){
+    // DD/MM/YYYY
+    var p = d.split('/')[0].split('/');
+    return p[0]+' '+MS[parseInt(p[1])-1];
+  }
+  return d;
+}
 
 var expType='variable';
 function setType(t){
