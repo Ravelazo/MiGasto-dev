@@ -609,16 +609,16 @@ function readGastos(){
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
-        // Fecha: puede venir como string "2026-03-15" o número serial de Sheets
+        // Fecha en formato único DD/MM/YYYY HH:MM:SS
         var rawDate = r[0];
         var dateStr = '';
         if(rawDate){
-          if(typeof rawDate === 'number'){
-            // Serial de Sheets: días desde 30/12/1899
-            var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
-            dateStr = d.toISOString().split('T')[0];
+          var s = String(rawDate).trim();
+          var parts = s.split(' ')[0].split('/');
+          if(parts.length === 3){
+            dateStr = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
           } else {
-            dateStr = String(rawDate).substring(0,10);
+            dateStr = s.substring(0,10);
           }
         }
         // Mes de pago: soporta "03. Marzo", "3", número puro
@@ -635,8 +635,8 @@ function readGastos(){
         return {
           id:       i+1,
           date:     dateStr,
-          card:     r[1] || '',
-          person:   r[2] || '',
+          dateFull: rawDate ? String(rawDate).trim() : dateStr,
+          card:     r[1] || '',          person:   r[2] || '',
           store:    r[3] || '',
           detail:   r[4] || '',
           amount:   isNaN(amt) ? 0 : amt,
@@ -701,6 +701,12 @@ function guardar(){
   var btn = document.getElementById('saveBtn');
   btn.disabled = true; btn.textContent = 'Guardando...';
 
+  var now2 = new Date();
+  var dd = String(now2.getDate()).padStart(2,'0');
+  var mm = String(now2.getMonth()+1).padStart(2,'0');
+  var yyyy = now2.getFullYear();
+  var hh = now2.toTimeString().substring(0,8);
+  var dateTimeStr = dd+'/'+mm+'/'+yyyy+' '+hh;
   var dateObj  = new Date(date);
   var year     = dateObj.getFullYear();
   var m        = dateObj.getMonth() + 1;
@@ -709,7 +715,8 @@ function guardar(){
   var monthLbl = ['01. Enero','02. Febrero','03. Marzo','04. Abril','05. Mayo','06. Junio',
                   '07. Julio','08. Agosto','09. Setiembre','10. Octubre','11. Noviembre','12. Diciembre'][pm-1];
 
-  var row = [date, card, person, store, detail, amount, monthLbl, year, payYear, S.expType];
+  var dateTimeStr = date + ' ' + new Date().toTimeString().substring(0,8);
+  var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType];
 
   apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:J:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
     values: [row]
@@ -925,9 +932,11 @@ function renderDash(){
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
   renderTxns('dTxns', exps.slice().sort(function(a,b){
-    var d = (b.date||'').localeCompare(a.date||'');
-    if(d !== 0) return d;
-    return b.id - a.id; // mismo día: más reciente por id
+    // Ordenar por fecha completa descendente (incluye hora si existe)
+    var da = a.dateFull || a.date || '';
+    var db = b.dateFull || b.date || '';
+    if(db !== da) return db.localeCompare(da);
+    return b.id - a.id;
   }).slice(0,8));
 }
 
