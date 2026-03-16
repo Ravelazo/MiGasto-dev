@@ -609,16 +609,23 @@ function readGastos(){
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
-        // Fecha en formato único DD/MM/YYYY HH:MM:SS
+        // Fecha: DD/MM/YYYY HH:MM:SS (texto) o número serial de Sheets
         var rawDate = r[0];
         var dateStr = '';
         if(rawDate){
-          var s = String(rawDate).trim();
-          var parts = s.split(' ')[0].split('/');
-          if(parts.length === 3){
-            dateStr = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
+          if(typeof rawDate === 'number'){
+            // Serial de Sheets → convertir a YYYY-MM-DD
+            var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+            dateStr = d.getUTCFullYear()+'-'+String(d.getUTCMonth()+1).padStart(2,'0')+'-'+String(d.getUTCDate()).padStart(2,'0');
           } else {
-            dateStr = s.substring(0,10);
+            var s = String(rawDate).trim();
+            var parts = s.split(' ')[0].split('/');
+            if(parts.length === 3){
+              // DD/MM/YYYY HH:MM:SS
+              dateStr = parts[2]+'-'+parts[1].padStart(2,'0')+'-'+parts[0].padStart(2,'0');
+            } else {
+              dateStr = s.substring(0,10);
+            }
           }
         }
         // Mes de pago: soporta "03. Marzo", "3", número puro
