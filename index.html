@@ -605,23 +605,41 @@ function getOrCreateSheet(){
 
 // ── LEER DATOS ───────────────────────────────────────────
 function readGastos(){
-  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:J')
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:J?valueRenderOption=UNFORMATTED_VALUE')
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
+        // Fecha: puede venir como string "2026-03-15" o número serial de Sheets
+        var rawDate = r[0];
+        var dateStr = '';
+        if(rawDate){
+          if(typeof rawDate === 'number'){
+            // Serial de Sheets: días desde 30/12/1899
+            var d = new Date(Math.round((rawDate - 25569) * 86400 * 1000));
+            dateStr = d.toISOString().split('T')[0];
+          } else {
+            dateStr = String(rawDate).substring(0,10);
+          }
+        }
+        // Mes de pago: soporta "03. Marzo", "3", número puro
         var payMonthRaw = String(r[6] || '').trim();
-        // Soporta "03. Marzo", "3. Marzo", "03", "3", número puro
-        var pm = payMonthRaw.replace(/\D.*$/,'').replace(/^0+/,'') || '';
-        if(!pm) pm = '1';
-        pm = String(parseInt(pm)).padStart(2,'0');
+        var pm = '';
+        if(typeof r[6] === 'number'){
+          pm = String(Math.round(r[6])).padStart(2,'0');
+        } else {
+          pm = payMonthRaw.replace(/\D.*$/,'').replace(/^0*/,'') || '1';
+          pm = String(parseInt(pm)||1).padStart(2,'0');
+        }
+        // Monto: número directo con UNFORMATTED_VALUE
+        var amt = typeof r[5] === 'number' ? r[5] : parseFloat(String(r[5]||'0').replace(/,/g,'.'));
         return {
-          id: i+1,
-          date:     r[0] ? r[0].substring(0,10) : '',
+          id:       i+1,
+          date:     dateStr,
           card:     r[1] || '',
           person:   r[2] || '',
           store:    r[3] || '',
           detail:   r[4] || '',
-          amount:   parseFloat(r[5]) || 0,
+          amount:   isNaN(amt) ? 0 : amt,
           payMonth: pm,
           payYear:  parseInt(r[8]) || now.getFullYear(),
           type:     r[9] || 'variable'
@@ -906,7 +924,11 @@ function renderDash(){
   renderDonut('svgCard','dlCard','dnCard',byCard,fmtS(total));
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
-  renderTxns('dTxns', exps.slice().sort(function(a,b){ return (b.date||'').localeCompare(a.date||''); }).slice(0,8));
+  renderTxns('dTxns', exps.slice().sort(function(a,b){
+    var d = (b.date||'').localeCompare(a.date||'');
+    if(d !== 0) return d;
+    return b.id - a.id; // mismo día: más reciente por id
+  }).slice(0,8));
 }
 
 function renderBars(curM,curY,cardF){
