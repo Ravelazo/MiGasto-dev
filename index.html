@@ -283,7 +283,7 @@ input:focus,select:focus{border-color:var(--blue)}
 .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600}
 .pill-up{background:#FFE9E9;color:#E05050}
 .pill-dn{background:var(--green-bg);color:var(--green)}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--text);color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:500;z-index:999;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(8px);background:var(--text);color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:500;z-index:999;pointer-events:none;opacity:0;transition:opacity .25s,transform .25s;white-space:normal;max-width:calc(100vw - 40px);text-align:center;box-shadow:0 4px 20px rgba(0,0,0,.25)}
 .toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
 .empty{text-align:center;padding:40px 20px;color:var(--text3)}
 .empty-ic{font-size:40px;margin-bottom:12px}
@@ -539,7 +539,7 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.1</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.2</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -1096,17 +1096,15 @@ function renderDash(){
   var fp=total?Math.round(fx/total*100):0,vp=total?Math.round(vr/total*100):0;
   document.getElementById('fvFVal').textContent=fmt(fx);document.getElementById('fvFPct').textContent=fp+'% del total';document.getElementById('fvFBar').style.width=fp+'%';
   document.getElementById('fvVVal').textContent=fmt(vr);document.getElementById('fvVPct').textContent=vp+'% del total';document.getElementById('fvVBar').style.width=vp+'%';
-  // Salary card — filtra por persona asignada
+  // Salary card — requiere persona asignada para funcionar correctamente
   var salaryCard=document.getElementById('salaryCard');
-  if(S.salary && S.salary > 0){
-    var salaryExps = S.salaryPerson
-      ? exps.filter(function(e){ return e.person === S.salaryPerson; })
-      : exps;
+  if(S.salary && S.salary > 0 && S.salaryPerson){
+    var salaryExps = getExps(m, y, 'all').filter(function(e){ return e.person === S.salaryPerson; });
     var gastado = salaryExps.reduce(function(s,e){return s+e.amount;},0);
     var disponible = S.salary - gastado;
     document.getElementById('salaryDisp').textContent = fmt(disponible);
     document.getElementById('salaryDisp').style.color = disponible >= 0 ? 'var(--green)' : 'var(--peach)';
-    document.getElementById('salaryTotal').textContent = 'De S/ '+S.salary.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})+' presupuestados'+(S.salaryPerson?' para '+S.salaryPerson:'');
+    document.getElementById('salaryTotal').textContent = 'De '+fmt(S.salary)+' presupuestados para '+S.salaryPerson;
     salaryCard.style.display='block';
   } else {
     salaryCard.style.display='none';
