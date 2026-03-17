@@ -49,7 +49,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .usr-ic{width:30px;height:30px;border-radius:50%;background:var(--blue-bg);border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--blue);cursor:pointer;position:relative}
 
 /* ── AVATAR DROPDOWN ── */
-.usr-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(29,34,51,.12);min-width:200px;z-index:300;overflow:hidden;display:none}
+.usr-menu{position:absolute;top:calc(100% + 8px);right:0;background:var(--surface);border:1.5px solid var(--border);border-radius:14px;box-shadow:0 8px 24px rgba(29,34,51,.12);min-width:210px;z-index:300;overflow:hidden;display:none}
 .usr-menu.open{display:block}
 .usr-menu-item{display:flex;align-items:center;gap:10px;padding:13px 16px;font-size:14px;font-weight:500;font-family:var(--font);color:var(--text2);cursor:pointer;border:none;background:none;width:100%;text-align:left;border-bottom:1px solid var(--border);transition:background .12s}
 .usr-menu-item:last-child{border-bottom:none}
@@ -227,6 +227,8 @@ input:focus,select:focus{border-color:var(--blue)}
 .cfg-item{display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:14px;justify-content:space-between}
 .cfg-item div{display:flex;align-items:center;gap:6px;flex:1;min-width:0}
 .cfg-nm{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cfg-edit{background:none;border:none;cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;transition:background .15s}
+.cfg-edit:hover{background:var(--blue-bg)}
 .cfg-rm{background:none;border:none;color:var(--peach);cursor:pointer;font-size:18px;padding:2px 6px;border-radius:6px;transition:background .15s;line-height:1;flex-shrink:0}
 .cfg-rm:hover{background:var(--peach-bg)}
 .add-row{display:flex;gap:8px;align-items:flex-end}
@@ -344,7 +346,8 @@ input:focus,select:focus{border-color:var(--blue)}
     <div class="logo" onclick="goPage('dash')" style="cursor:pointer"><div class="logo-ic">💸</div>MiGasto</div>
     <div class="hdr-r">
       <button class="db-btn" onclick="abrirSheet()">⬡ Ver datos</button>
-      <div class="usr-ic" id="usrIc" onclick="toggleUsrMenu()">?
+      <div style="position:relative">
+        <div class="usr-ic" id="usrIc" onclick="toggleUsrMenu(event)">?</div>
         <div class="usr-menu" id="usrMenu">
           <button class="usr-menu-item" onclick="abrirFaq()"><span class="usr-menu-ic">❓</span>Ayuda / FAQ</button>
           <button class="usr-menu-item" onclick="instalarPWA()"><span class="usr-menu-ic">📲</span>Crear acceso directo</button>
@@ -386,7 +389,7 @@ input:focus,select:focus{border-color:var(--blue)}
   </div>
   <div class="chips" id="chips"></div>
   <div id="salaryCard" style="display:none" class="sc-salary">
-    <div class="sc-salary-lbl">Disponible este mes</div>
+    <div class="sc-salary-lbl">Presupuesto disponible este mes</div>
     <div class="sc-salary-val" id="salaryDisp">—</div>
     <div class="sc-salary-total" id="salaryTotal">—</div>
   </div>
@@ -504,15 +507,20 @@ input:focus,select:focus{border-color:var(--blue)}
 
   <!-- Sueldo -->
   <div class="cfg-salary">
-    <div class="cfg-salary-ttl">💰 Sueldo disponible</div>
-    <div class="cfg-salary-sub">Se usa para mostrar cuánto te queda disponible en el dashboard</div>
+    <div class="cfg-salary-ttl">💰 Presupuesto / Sueldo</div>
+    <div class="cfg-salary-sub">El presupuesto se descuenta solo con los gastos de la persona asignada</div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Persona asignada al presupuesto</label>
+      <select id="salaryPerson"></select>
+    </div>
     <div class="fg" style="margin-bottom:0">
+      <label>Monto mensual (S/)</label>
       <div class="amt-w">
         <span class="amt-pre">S/</span>
         <input id="salaryInput" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtAmt(this)" onblur="finalAmt(this)">
       </div>
     </div>
-    <button class="save-btn" style="margin-top:12px" onclick="saveSalary()">Guardar sueldo</button>
+    <button class="save-btn" style="margin-top:12px" onclick="saveSalary()">Guardar presupuesto</button>
   </div>
 </div>
 
@@ -550,7 +558,8 @@ var S = {
   curMonth: now.getMonth()+1, curYear: now.getFullYear(),
   annYear:  now.getFullYear(), storePeriod: 1,
   expType: 'variable', sheetUrl: null, sheetId: null,
-  accessToken: null, userEmail: null, userName: null
+  accessToken: null, userEmail: null, userName: null,
+  salary: 0, salaryPerson: ''
 };
 
 // ── CONSTANTES ───────────────────────────────────────────
@@ -989,10 +998,37 @@ function refreshAll(){
 
 function renderCfgList(id,arr,fn,extras){
   var el=document.getElementById(id);
+  if(!el) return;
+  var isCards = (fn === removeCard);
   el.innerHTML=arr.map(function(v,i){
     var extra=extras&&extras[i]?'<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>':'';
-    return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div><button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button></div>';
+    var editFn = isCards ? 'editCard' : 'editPerson';
+    return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
+      +'<div style="display:flex;gap:4px">'
+      +'<button class="cfg-edit" onclick="'+editFn+'('+i+')" title="Editar">✏️</button>'
+      +'<button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button>'
+      +'</div></div>';
   }).join('');
+}
+
+function editCard(i){
+  var nombre=prompt('Nombre de la tarjeta:',S.cards[i]);
+  if(nombre===null) return;
+  nombre=nombre.trim();
+  if(!nombre){toast('El nombre no puede estar vacío');return;}
+  var dia=prompt('Día de pago (1-31, dejar vacío si no aplica):',S.cutoffs[i]||'');
+  if(dia===null) return;
+  S.cards[i]=nombre; S.cutoffs[i]=parseInt(dia)||'';
+  refreshAll();renderCfgPage();saveConfig();toast('"'+nombre+'" actualizada ✓');
+}
+
+function editPerson(i){
+  var nombre=prompt('Nombre de la persona:',S.persons[i]);
+  if(nombre===null) return;
+  nombre=nombre.trim();
+  if(!nombre){toast('El nombre no puede estar vacío');return;}
+  S.persons[i]=nombre;
+  refreshAll();renderCfgPage();saveConfig();toast('"'+nombre+'" actualizada ✓');
 }
 
 function addCard(){
@@ -1060,16 +1096,20 @@ function renderDash(){
   var fp=total?Math.round(fx/total*100):0,vp=total?Math.round(vr/total*100):0;
   document.getElementById('fvFVal').textContent=fmt(fx);document.getElementById('fvFPct').textContent=fp+'% del total';document.getElementById('fvFBar').style.width=fp+'%';
   document.getElementById('fvVVal').textContent=fmt(vr);document.getElementById('fvVPct').textContent=vp+'% del total';document.getElementById('fvVBar').style.width=vp+'%';
-  // Salary card
-  var salaryCard = document.getElementById('salaryCard');
+  // Salary card — filtra por persona asignada
+  var salaryCard=document.getElementById('salaryCard');
   if(S.salary && S.salary > 0){
-    var disponible = S.salary - total;
+    var salaryExps = S.salaryPerson
+      ? exps.filter(function(e){ return e.person === S.salaryPerson; })
+      : exps;
+    var gastado = salaryExps.reduce(function(s,e){return s+e.amount;},0);
+    var disponible = S.salary - gastado;
     document.getElementById('salaryDisp').textContent = fmt(disponible);
-    document.getElementById('salaryTotal').textContent = 'De un sueldo de ' + fmt(S.salary);
     document.getElementById('salaryDisp').style.color = disponible >= 0 ? 'var(--green)' : 'var(--peach)';
-    salaryCard.style.display = 'block';
+    document.getElementById('salaryTotal').textContent = 'De S/ '+S.salary.toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2})+' presupuestados'+(S.salaryPerson?' para '+S.salaryPerson:'');
+    salaryCard.style.display='block';
   } else {
-    salaryCard.style.display = 'none';
+    salaryCard.style.display='none';
   }
   renderBars(m,y,cFilter);
   var byCard={};exps.forEach(function(e){byCard[e.card]=(byCard[e.card]||0)+e.amount;});
@@ -1216,15 +1256,13 @@ function selectSec(id,label){
 document.addEventListener('click',function(e){
   var sel=document.querySelector('.sec-selector');
   if(sel&&!sel.contains(e.target))sel.classList.remove('open');
-  // Cerrar menú avatar si clic fuera
   var usrMenu=document.getElementById('usrMenu');
-  var usrIc=document.getElementById('usrIc');
-  if(usrMenu&&usrIc&&!usrIc.contains(e.target))usrMenu.classList.remove('open');
+  if(usrMenu&&!usrMenu.contains(e.target)){usrMenu.classList.remove('open');}
 });
 
 // ── AVATAR MENU ──────────────────────────────────────────
 function toggleUsrMenu(e){
-  if(e) e.stopPropagation();
+  e.stopPropagation();
   document.getElementById('usrMenu').classList.toggle('open');
 }
 
@@ -1298,19 +1336,36 @@ function toggleFaq(i){
 
 // ── CONFIG PAGE ───────────────────────────────────────────
 function renderCfgPage(){
-  renderCfgList2('cfgCards2', S.cards, removeCard2, S.cutoffs);
-  renderCfgList2('cfgPersons2', S.persons, removePerson2, null);
-  // Sueldo
-  if(S.salary) document.getElementById('salaryInput').value = S.salary.toFixed(2);
+  renderCfgList2('cfgCards2',S.cards,removeCard2,S.cutoffs);
+  renderCfgList2('cfgPersons2',S.persons,removePerson2,null);
+  // Populate persona selector del sueldo
+  var sp=document.getElementById('salaryPerson');
+  if(sp){
+    sp.innerHTML='';
+    S.persons.forEach(function(p){
+      var o=document.createElement('option');
+      o.value=o.textContent=p;
+      if(p===S.salaryPerson) o.selected=true;
+      sp.appendChild(o);
+    });
+    // Default: primera persona
+    if(!S.salaryPerson && S.persons.length) sp.value=S.persons[0];
+  }
+  if(S.salary) document.getElementById('salaryInput').value=S.salary.toFixed(2);
 }
 
 function renderCfgList2(id, arr, fn, extras){
   var el = document.getElementById(id);
   if(!el) return;
+  var isCards = (fn === removeCard2);
   el.innerHTML = arr.map(function(v,i){
     var extra = extras&&extras[i] ? '<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>' : '';
+    var editFn = isCards ? 'editCard' : 'editPerson';
     return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
-      +'<button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button></div>';
+      +'<div style="display:flex;gap:4px">'
+      +'<button class="cfg-edit" onclick="'+editFn+'('+i+')" title="Editar">✏️</button>'
+      +'<button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button>'
+      +'</div></div>';
   }).join('');
 }
 
@@ -1341,17 +1396,20 @@ function removePerson2(i){
 
 // ── SUELDO ────────────────────────────────────────────────
 function saveSalary(){
-  var v = parseFloat(document.getElementById('salaryInput').value.replace(',','.'));
+  var v=parseFloat(document.getElementById('salaryInput').value.replace(',','.'));
   if(!v||isNaN(v)){toast('Ingresa un monto válido');return;}
-  S.salary = v;
-  localStorage.setItem('mg_salary', String(v));
+  var person=document.getElementById('salaryPerson').value;
+  S.salary=v; S.salaryPerson=person;
+  localStorage.setItem('mg_salary',String(v));
+  localStorage.setItem('mg_salary_person',person);
   renderDash();
-  toast('✓ Sueldo guardado');
+  toast('✓ Presupuesto guardado');
 }
 
 function loadSalary(){
-  var saved = localStorage.getItem('mg_salary');
-  if(saved) S.salary = parseFloat(saved) || 0;
+  var saved=localStorage.getItem('mg_salary');
+  if(saved) S.salary=parseFloat(saved)||0;
+  S.salaryPerson=localStorage.getItem('mg_salary_person')||'';
 }
 
 // ── TARJETA DEFAULT EN CUENTA NUEVA ──────────────────────
