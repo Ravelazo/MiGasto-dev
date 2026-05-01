@@ -421,9 +421,18 @@ input:focus,select:focus{border-color:var(--blue)}
     <div class="fg"><label>Tarjeta <button onclick="selectSec('cfg','⚙️ Configuración');closeSecMenu()" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;margin-left:4px">+ Agregar / Editar</button></label><select id="fCard"></select></div>
     <div class="row2">
       <div class="fg"><label>Persona <button onclick="selectSec('cfg','⚙️ Configuración');closeSecMenu()" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;margin-left:4px">+ Agregar / Editar</button></label><select id="fPerson"></select></div>
-      <div class="fg"><label>Monto (S/)</label><div class="amt-w"><span class="amt-pre">S/</span><input id="fAmount" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtAmt(this)" onblur="finalAmt(this)"></div></div>
+      <div class="fg"><label>Monto</label><div class="amt-w"><span class="amt-pre" id="amtPre">S/</span><input id="fAmount" type="text" inputmode="decimal" placeholder="0.00" oninput="fmtAmt(this)" onblur="finalAmt(this)"></div></div>
     </div>
     <div class="fg"><label>Tienda / Lugar</label><div class="ac-w"><input id="fStore" type="text" placeholder="Ej: Plaza Vea, Netflix..." oninput="acIn(this)" onblur="acBlur()" autocomplete="off"><div class="ac-list" id="acList" style="display:none"></div></div></div>
+    <div class="row2">
+      <div class="fg"><label>Categoría</label><select id="fCategory"></select></div>
+      <div class="fg"><label>Moneda</label>
+        <div class="tt">
+          <button class="tb vr on" id="tbPEN" onclick="setCurrency('PEN')">🇵🇪 Soles</button>
+          <button class="tb fx" id="tbUSD" onclick="setCurrency('USD')">🇺🇸 Dólares</button>
+        </div>
+      </div>
+    </div>
     <div class="fg"><label>Detalle (opcional)</label><input id="fDetail" type="text" placeholder="Descripción breve..."></div>
     <div class="row2">
       <div class="fg"><label>Mes de pago</label><select id="fMonth"><option value="01">01. Enero</option><option value="02">02. Febrero</option><option value="03">03. Marzo</option><option value="04">04. Abril</option><option value="05">05. Mayo</option><option value="06">06. Junio</option><option value="07">07. Julio</option><option value="08">08. Agosto</option><option value="09">09. Setiembre</option><option value="10">10. Octubre</option><option value="11">11. Noviembre</option><option value="12">12. Diciembre</option></select></div>
@@ -483,6 +492,16 @@ input:focus,select:focus{border-color:var(--blue)}
 <div id="pg-cfg" class="pg">
   <div class="mbar"><div><span class="mtitle">Configuración</span></div></div>
 
+  <!-- Categorías -->
+  <div class="fc">
+    <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">🏷️ Categorías de gasto</div>
+    <div class="cfg-list" id="cfgCats"></div>
+    <div class="add-row">
+      <input id="newCat" type="text" placeholder="Ej: Alimentación, Transporte...">
+      <button class="add-btn" onclick="addCat()">+</button>
+    </div>
+  </div>
+
   <!-- Tarjetas -->
   <div class="fc">
     <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">💳 Tarjetas</div>
@@ -539,7 +558,7 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.2</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -557,9 +576,11 @@ var S = {
   cards:[], cutoffs:[], persons:[], stores:[], expenses:[],
   curMonth: now.getMonth()+1, curYear: now.getFullYear(),
   annYear:  now.getFullYear(), storePeriod: 1,
-  expType: 'variable', sheetUrl: null, sheetId: null,
+  expType: 'variable', currency: 'PEN',
+  sheetUrl: null, sheetId: null,
   accessToken: null, userEmail: null, userName: null,
-  salary: 0, salaryPerson: ''
+  salary: 0, salaryPerson: '',
+  categories: ['Alimentación','Transporte','Entretenimiento','Salud','Hogar','Ropa','Educación','Otros']
 };
 
 // ── CONSTANTES ───────────────────────────────────────────
@@ -699,12 +720,12 @@ function getOrCreateSheet(){
         S.sheetUrl = 'https://docs.google.com/spreadsheets/d/' + id;
         localStorage.setItem('mg_sheet_id', id);
         // Encabezados Gastos
-        return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Gastos!A1:J1?valueInputOption=RAW', {
-          values: [['Marca temporal','Tarjeta','Persona','Tienda','Detalle','Monto','Mes de pago','Año','Año del gasto','Tipo']]
+        return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Gastos!A1:N1?valueInputOption=RAW', {
+          values: [['Marca temporal','Tarjeta','Persona','Tienda','Detalle','Monto','Mes de pago','Año','Año del gasto','Tipo','Categoría','Moneda','Estado','Grupo cuota']]
         }).then(function(){
           // Encabezados Config
-          return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Config!A1:D1?valueInputOption=RAW', {
-            values: [['tarjetas','personas','tiendas','corte']]
+          return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Config!A1:E1?valueInputOption=RAW', {
+            values: [['tarjetas','personas','tiendas','corte','categorias']]
           });
         }).then(function(){
           // Config con valores por defecto
@@ -716,7 +737,7 @@ function getOrCreateSheet(){
 
 // ── LEER DATOS ───────────────────────────────────────────
 function readGastos(){
-  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:J?valueRenderOption=UNFORMATTED_VALUE')
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:N?valueRenderOption=UNFORMATTED_VALUE')
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
@@ -763,21 +784,25 @@ function readGastos(){
           amount:   isNaN(amt) ? 0 : amt,
           payMonth: pm,
           payYear:  parseInt(r[8]) || now.getFullYear(),
-          type:     r[9] || 'variable'
+          type:     r[9]  || 'variable',
+          category: r[10] || '',
+          currency: r[11] || 'PEN',
+          status:   r[12] || 'pendiente'
         };
       }).filter(function(r){ return r.amount > 0; });
     });
 }
 
 function readConfig(){
-  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A2:D')
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A2:E')
     .then(function(data){
       var rows = data.values || [];
       return {
-        cards:   rows.map(function(r){ return r[0]; }).filter(Boolean),
-        persons: rows.map(function(r){ return r[1]; }).filter(Boolean),
-        stores:  rows.map(function(r){ return r[2]; }).filter(Boolean),
-        cutoffs: rows.map(function(r){ return r[3] || ''; })
+        cards:      rows.map(function(r){ return r[0]; }).filter(Boolean),
+        persons:    rows.map(function(r){ return r[1]; }).filter(Boolean),
+        stores:     rows.map(function(r){ return r[2]; }).filter(Boolean),
+        cutoffs:    rows.map(function(r){ return r[3] || ''; }),
+        categories: rows.map(function(r){ return r[4]; }).filter(Boolean)
       };
     });
 }
@@ -836,9 +861,10 @@ function guardar(){
   var monthLbl = ['01. Enero','02. Febrero','03. Marzo','04. Abril','05. Mayo','06. Junio',
                   '07. Julio','08. Agosto','09. Setiembre','10. Octubre','11. Noviembre','12. Diciembre'][pm-1];
 
-  var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType];
+  var category = document.getElementById('fCategory').value || '';
+  var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType, category, S.currency, 'pendiente'];
 
-  apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:J:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
+  apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:N:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
     values: [row]
   }).then(function(){
     // Agregar tienda al Config si es nueva
@@ -854,6 +880,7 @@ function guardar(){
     document.getElementById('fStore').value  = '';
     document.getElementById('fDetail').value = '';
     setType('variable');
+    setCurrency('PEN');
     // Resetear fecha al día de hoy
     document.getElementById('fDate').value = new Date().toISOString().split('T')[0];
     toast('✓ Gasto guardado — puedes registrar otro');
@@ -867,14 +894,14 @@ function guardar(){
 
 // ── GUARDAR CONFIG ───────────────────────────────────────
 function saveConfig(){
-  var maxRows = Math.max(S.cards.length, S.persons.length, S.stores.length);
+  var maxRows = Math.max(S.cards.length, S.persons.length, S.stores.length, S.categories.length);
   var rows = [];
   for(var i = 0; i < maxRows; i++){
-    rows.push([S.cards[i]||'', S.persons[i]||'', S.stores[i]||'', S.cutoffs[i]||'']);
+    rows.push([S.cards[i]||'', S.persons[i]||'', S.stores[i]||'', S.cutoffs[i]||'', S.categories[i]||'']);
   }
   // Limpiar y reescribir
-  return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A2:D?valueInputOption=RAW', {
-    values: rows.length ? rows : [['','','','']]
+  return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A2:E?valueInputOption=RAW', {
+    values: rows.length ? rows : [['','','','','']]
   });
 }
 
@@ -884,11 +911,12 @@ function cargarDatos(){
   getOrCreateSheet()
     .then(function(){ return Promise.all([readGastos(), readConfig()]); })
     .then(function(res){
-      S.expenses = res[0];
-      S.cards    = res[1].cards;
-      S.persons  = res[1].persons;
-      S.stores   = res[1].stores;
-      S.cutoffs  = res[1].cutoffs;
+      S.expenses   = res[0];
+      S.cards      = res[1].cards;
+      S.persons    = res[1].persons;
+      S.stores     = res[1].stores;
+      S.cutoffs    = res[1].cutoffs;
+      if(res[1].categories && res[1].categories.length) S.categories = res[1].categories;
       refreshAll();
     }).catch(function(err){
       toast('Error cargando datos');
@@ -923,7 +951,12 @@ if(checkToken()){
 //  UI — igual que antes
 // ══════════════════════════════════════════════
 
-function fmt(n){ return isNaN(n)||n==null?'—':'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmt(n, currency){ 
+  if(isNaN(n)||n==null) return '—';
+  var sym = (currency === 'USD') ? '$ ' : 'S/ ';
+  return sym + Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); 
+}
+function fmtE(e){ return fmt(e.amount, e.currency); }
 function fmtS(n){ if(!n) return 'S/ 0.00'; if(n>=1000) return 'S/'+(n/1000).toFixed(1).replace('.0','')+'k'; return 'S/ '+Number(n).toLocaleString('es-PE',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function parseDateFull(s){
   if(!s) return '';
@@ -970,6 +1003,62 @@ function setType(t){
   document.getElementById('tbVr').className='tb vr'+(t==='variable'?' on':'');
 }
 
+// ── MONEDA ────────────────────────────────────────────────
+function setCurrency(c){
+  S.currency = c;
+  document.getElementById('tbPEN').className = 'tb vr' + (c==='PEN'?' on':'');
+  document.getElementById('tbUSD').className = 'tb fx' + (c==='USD'?' on':'');
+  document.getElementById('amtPre').textContent = c==='PEN' ? 'S/' : '$';
+}
+
+// ── CATEGORÍAS ────────────────────────────────────────────
+function refreshCategorySelect(){
+  var sel = document.getElementById('fCategory');
+  if(!sel) return;
+  var prev = sel.value;
+  sel.innerHTML = '<option value="">Sin categoría</option>';
+  S.categories.forEach(function(cat){
+    var o = document.createElement('option');
+    o.value = o.textContent = cat;
+    if(cat === prev) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function addCat(){
+  var ni = document.getElementById('newCat');
+  var v = ni.value.trim();
+  if(!v) return;
+  if(S.categories.indexOf(v) >= 0){ toast('Esa categoría ya existe'); return; }
+  S.categories.push(v);
+  ni.value = '';
+  refreshCategorySelect();
+  renderCfgPage();
+  saveConfig();
+  toast('"'+v+'" agregada ✓');
+}
+
+function removeCat(i){
+  var nm = S.categories[i];
+  S.categories.splice(i, 1);
+  refreshCategorySelect();
+  renderCfgPage();
+  saveConfig();
+  toast('"'+nm+'" eliminada');
+}
+
+function editCat(i){
+  var nombre = prompt('Nombre de la categoría:', S.categories[i]);
+  if(nombre === null) return;
+  nombre = nombre.trim();
+  if(!nombre){ toast('El nombre no puede estar vacío'); return; }
+  S.categories[i] = nombre;
+  refreshCategorySelect();
+  renderCfgPage();
+  saveConfig();
+  toast('"'+nombre+'" actualizada ✓');
+}
+
 function acIn(el){ var q=el.value.trim().toLowerCase(); var list=document.getElementById('acList'); if(!q){list.style.display='none';return;} var m=S.stores.filter(function(s){return s.toLowerCase().indexOf(q)>=0;}).slice(0,6); if(!m.length){list.style.display='none';return;} list.innerHTML=m.map(function(s){return '<div class="ac-item" onmousedown="acSel(\''+s.replace(/'/g,"\\'")+'\')">'+s+'</div>';}).join(''); list.style.display='block'; }
 function acBlur(){ setTimeout(function(){document.getElementById('acList').style.display='none';},150); }
 function acSel(v){ document.getElementById('fStore').value=v; document.getElementById('acList').style.display='none'; }
@@ -993,6 +1082,7 @@ function refreshAll(){
   S.cards.forEach(function(c){var b=document.createElement('button');b.className='chip'+(c===activeCard?' on':'');b.dataset.card=c;b.textContent=c;b.addEventListener('click',function(){cf.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});this.classList.add('on');renderDash();});cf.appendChild(b);});
   renderCfgList('cfgCards',S.cards,removeCard,S.cutoffs);
   renderCfgList('cfgPersons',S.persons,removePerson,null);
+  refreshCategorySelect();
   renderDash();
 }
 
@@ -1190,7 +1280,8 @@ function renderTxns(id,exps){
   if(!exps.length){el.style.border='none';el.style.boxShadow='none';el.innerHTML='<div class="empty"><div class="empty-ic">💸</div><div class="empty-t">Sin gastos este mes</div><div class="empty-s">Toca "+ Nuevo" para registrar</div></div>';return;}
   el.style.border='1px solid var(--border)';el.style.boxShadow='var(--sh)';
   el.innerHTML=exps.map(function(e){
-    return '<div class="txn"><div class="txn-ic">'+emoji(e.store)+'</div><div class="txn-bd"><div class="txn-nm">'+e.store+'</div><div class="txn-mt"><span class="tag '+cardTag(e.card)+'">'+e.card+'</span><span class="tag '+(e.type==='fixed'?'tag-fx':'tag-vr')+'">'+(e.type==='fixed'?'Fijo':'Variable')+'</span>'+(e.date?fmtDs(e.date):'')+(e.detail?' · '+e.detail:'')+'</div></div><div class="txn-rt"><div class="txn-am">'+fmt(e.amount)+'</div><div class="txn-pe">'+e.person+'</div></div></div>';
+    var catBadge = e.category ? '<span class="tag" style="background:var(--yellow-bg);color:var(--yellow)">'+e.category+'</span>' : '';
+    return '<div class="txn"><div class="txn-ic">'+emoji(e.store)+'</div><div class="txn-bd"><div class="txn-nm">'+e.store+'</div><div class="txn-mt"><span class="tag '+cardTag(e.card)+'">'+e.card+'</span><span class="tag '+(e.type==='fixed'?'tag-fx':'tag-vr')+'">'+(e.type==='fixed'?'Fijo':'Variable')+'</span>'+catBadge+(e.date?fmtDs(e.date):'')+(e.detail?' · '+e.detail:'')+'</div></div><div class="txn-rt"><div class="txn-am">'+fmtE(e)+'</div><div class="txn-pe">'+e.person+'</div></div></div>';
   }).join('');
 }
 
@@ -1334,6 +1425,7 @@ function toggleFaq(i){
 
 // ── CONFIG PAGE ───────────────────────────────────────────
 function renderCfgPage(){
+  renderCfgList2('cfgCats', S.categories, removeCat, null);
   renderCfgList2('cfgCards2',S.cards,removeCard2,S.cutoffs);
   renderCfgList2('cfgPersons2',S.persons,removePerson2,null);
   // Populate persona selector del sueldo
@@ -1355,10 +1447,11 @@ function renderCfgPage(){
 function renderCfgList2(id, arr, fn, extras){
   var el = document.getElementById(id);
   if(!el) return;
+  var isCats = (fn === removeCat);
   var isCards = (fn === removeCard2);
   el.innerHTML = arr.map(function(v,i){
     var extra = extras&&extras[i] ? '<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>' : '';
-    var editFn = isCards ? 'editCard' : 'editPerson';
+    var editFn = isCats ? 'editCat' : (isCards ? 'editCard' : 'editPerson');
     return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
       +'<div style="display:flex;gap:4px">'
       +'<button class="cfg-edit" onclick="'+editFn+'('+i+')" title="Editar">✏️</button>'
