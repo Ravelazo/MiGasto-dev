@@ -425,7 +425,12 @@ input:focus,select:focus{border-color:var(--blue)}
     </div>
     <div class="fg"><label>Tienda / Lugar</label><div class="ac-w"><input id="fStore" type="text" placeholder="Ej: Plaza Vea, Netflix..." oninput="acIn(this)" onblur="acBlur()" autocomplete="off"><div class="ac-list" id="acList" style="display:none"></div></div></div>
     <div class="row2">
-      <div class="fg"><label>Categoría</label><select id="fCategory"></select></div>
+      <div class="fg"><label>Categoría</label>
+        <div class="ac-w">
+          <input id="fCategory" type="text" placeholder="Ej: Alimentación, Salud..." oninput="acCatIn(this)" onblur="acCatBlur()" autocomplete="off">
+          <div class="ac-list" id="acCatList" style="display:none"></div>
+        </div>
+      </div>
       <div class="fg"><label>Moneda</label>
         <div class="tt">
           <button class="tb vr on" id="tbPEN" onclick="setCurrency('PEN')">🇵🇪 Soles</button>
@@ -558,7 +563,7 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.3</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -720,8 +725,8 @@ function getOrCreateSheet(){
         S.sheetUrl = 'https://docs.google.com/spreadsheets/d/' + id;
         localStorage.setItem('mg_sheet_id', id);
         // Encabezados Gastos
-        return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Gastos!A1:N1?valueInputOption=RAW', {
-          values: [['Marca temporal','Tarjeta','Persona','Tienda','Detalle','Monto','Mes de pago','Año','Año del gasto','Tipo','Categoría','Moneda','Estado','Grupo cuota']]
+        return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Gastos!A1:O1?valueInputOption=RAW', {
+          values: [['Marca temporal','Tarjeta','Persona','Tienda','Detalle','Monto','Mes de pago','Año','Año del gasto','Tipo','Categoría','Moneda','Estado','Grupo cuota','Registro']]
         }).then(function(){
           // Encabezados Config
           return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + id + '/values/Config!A1:E1?valueInputOption=RAW', {
@@ -735,9 +740,33 @@ function getOrCreateSheet(){
     });
 }
 
-// ── LEER DATOS ───────────────────────────────────────────
+// ── ACTUALIZAR HEADERS DEL SHEET EXISTENTE ───────────────
+function updateSheetHeaders(){
+  // Lee la fila 1 de Gastos y actualiza si faltan columnas nuevas
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A1:O1')
+    .then(function(data){
+      var row = (data.values && data.values[0]) || [];
+      // Si ya tiene 15 columnas, no hacer nada
+      if(row.length >= 15) return Promise.resolve();
+      return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A1:O1?valueInputOption=RAW', {
+        values: [['Marca temporal','Tarjeta','Persona','Tienda','Detalle','Monto','Mes de pago','Año','Año del gasto','Tipo','Categoría','Moneda','Estado','Grupo cuota','Registro']]
+      });
+    }).catch(function(){}); // no bloquear si falla
+}
+
+// ── ACTUALIZAR HEADERS CONFIG ────────────────────────────
+function updateConfigHeaders(){
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A1:E1')
+    .then(function(data){
+      var row = (data.values && data.values[0]) || [];
+      if(row.length >= 5) return Promise.resolve();
+      return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Config!A1:E1?valueInputOption=RAW', {
+        values: [['tarjetas','personas','tiendas','corte','categorias']]
+      });
+    }).catch(function(){});
+}
 function readGastos(){
-  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:N?valueRenderOption=UNFORMATTED_VALUE')
+  return apiGet('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A2:O?valueRenderOption=UNFORMATTED_VALUE')
     .then(function(data){
       var rows = data.values || [];
       return rows.map(function(r, i){
@@ -787,7 +816,9 @@ function readGastos(){
           type:     r[9]  || 'variable',
           category: r[10] || '',
           currency: r[11] || 'PEN',
-          status:   r[12] || 'pendiente'
+          status:   r[12] || 'pendiente',
+          groupId:  r[13] || '',
+          registro: r[14] || 'gasto'
         };
       }).filter(function(r){ return r.amount > 0; });
     });
@@ -862,14 +893,21 @@ function guardar(){
                   '07. Julio','08. Agosto','09. Setiembre','10. Octubre','11. Noviembre','12. Diciembre'][pm-1];
 
   var category = document.getElementById('fCategory').value || '';
-  var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType, category, S.currency, 'pendiente'];
+  var row = [dateTimeStr, card, person, store, detail, amount, monthLbl, year, payYear, S.expType, category, S.currency, 'pendiente', '', 'gasto'];
 
-  apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:N:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
+  apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:O:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
     values: [row]
   }).then(function(){
     // Agregar tienda al Config si es nueva
     if(store && S.stores.indexOf(store) < 0){
       S.stores.push(store);
+    }
+    // Agregar categoría al Config si es nueva
+    var catVal = document.getElementById('fCategory').value.trim();
+    if(catVal && S.categories.indexOf(catVal) < 0){
+      S.categories.push(catVal);
+    }
+    if(store && S.stores.indexOf(store) < 0 || catVal && S.categories.indexOf(catVal) < 0){
       return saveConfig();
     }
   }).then(function(){
@@ -909,6 +947,7 @@ function saveConfig(){
 function cargarDatos(){
   document.getElementById('dTotal').textContent = 'Cargando...';
   getOrCreateSheet()
+    .then(function(){ return Promise.all([updateSheetHeaders(), updateConfigHeaders()]); })
     .then(function(){ return Promise.all([readGastos(), readConfig()]); })
     .then(function(res){
       S.expenses   = res[0];
@@ -1011,19 +1050,20 @@ function setCurrency(c){
   document.getElementById('amtPre').textContent = c==='PEN' ? 'S/' : '$';
 }
 
-// ── CATEGORÍAS ────────────────────────────────────────────
-function refreshCategorySelect(){
-  var sel = document.getElementById('fCategory');
-  if(!sel) return;
-  var prev = sel.value;
-  sel.innerHTML = '<option value="">Sin categoría</option>';
-  S.categories.forEach(function(cat){
-    var o = document.createElement('option');
-    o.value = o.textContent = cat;
-    if(cat === prev) o.selected = true;
-    sel.appendChild(o);
-  });
+// ── AUTOCOMPLETE CATEGORÍA ────────────────────────────────
+function acCatIn(el){
+  var q = el.value.trim().toLowerCase();
+  var list = document.getElementById('acCatList');
+  if(!q){ list.style.display='none'; return; }
+  var m = S.categories.filter(function(c){ return c.toLowerCase().indexOf(q) >= 0; }).slice(0,6);
+  if(!m.length){ list.style.display='none'; return; }
+  list.innerHTML = m.map(function(c){
+    return '<div class="ac-item" onmousedown="acCatSel(\''+c.replace(/'/g,"\\'")+'\')">'+c+'</div>';
+  }).join('');
+  list.style.display = 'block';
 }
+function acCatBlur(){ setTimeout(function(){ document.getElementById('acCatList').style.display='none'; }, 150); }
+function acCatSel(v){ document.getElementById('fCategory').value = v; document.getElementById('acCatList').style.display='none'; }
 
 function addCat(){
   var ni = document.getElementById('newCat');
@@ -1032,7 +1072,6 @@ function addCat(){
   if(S.categories.indexOf(v) >= 0){ toast('Esa categoría ya existe'); return; }
   S.categories.push(v);
   ni.value = '';
-  refreshCategorySelect();
   renderCfgPage();
   saveConfig();
   toast('"'+v+'" agregada ✓');
@@ -1041,7 +1080,6 @@ function addCat(){
 function removeCat(i){
   var nm = S.categories[i];
   S.categories.splice(i, 1);
-  refreshCategorySelect();
   renderCfgPage();
   saveConfig();
   toast('"'+nm+'" eliminada');
@@ -1053,7 +1091,6 @@ function editCat(i){
   nombre = nombre.trim();
   if(!nombre){ toast('El nombre no puede estar vacío'); return; }
   S.categories[i] = nombre;
-  refreshCategorySelect();
   renderCfgPage();
   saveConfig();
   toast('"'+nombre+'" actualizada ✓');
@@ -1082,7 +1119,6 @@ function refreshAll(){
   S.cards.forEach(function(c){var b=document.createElement('button');b.className='chip'+(c===activeCard?' on':'');b.dataset.card=c;b.textContent=c;b.addEventListener('click',function(){cf.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});this.classList.add('on');renderDash();});cf.appendChild(b);});
   renderCfgList('cfgCards',S.cards,removeCard,S.cutoffs);
   renderCfgList('cfgPersons',S.persons,removePerson,null);
-  refreshCategorySelect();
   renderDash();
 }
 
