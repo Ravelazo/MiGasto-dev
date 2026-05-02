@@ -649,11 +649,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.6</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.7</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.1.6 — OAuth directo + Sheets API
+//  MIGASTO v1.1.7 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1905,6 +1905,18 @@ function setDefaultConfig(id){
     values: [['Tarjeta 1', S.userName||'Usuario', '', '']]
   });
 }
+
+// ── SCROLL HORIZONTAL CON MOUSE ───────────────────────────
+document.addEventListener('DOMContentLoaded', function(){
+  ['chips','payBtns'].forEach(function(id){
+    var el = document.getElementById(id);
+    if(el){
+      el.addEventListener('wheel', function(e){
+        if(e.deltaY !== 0){ e.preventDefault(); el.scrollLeft += e.deltaY; }
+      }, {passive: false});
+    }
+  });
+});
 </script>
 </body>
 </html>
