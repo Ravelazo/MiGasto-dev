@@ -425,7 +425,7 @@ input:focus,select:focus{border-color:var(--blue)}
     </div>
     <div class="fg"><label>Tienda / Lugar</label><div class="ac-w"><input id="fStore" type="text" placeholder="Ej: Plaza Vea, Netflix..." oninput="acIn(this)" onblur="acBlur()" autocomplete="off"><div class="ac-list" id="acList" style="display:none"></div></div></div>
     <div class="row2">
-      <div class="fg"><label>Categoría</label>
+      <div class="fg"><label>Categoría <button onclick="selectSec('cfg','⚙️ Configuración');closeSecMenu()" style="font-size:11px;color:var(--blue);background:none;border:none;cursor:pointer;font-family:var(--font);font-weight:500;margin-left:4px">+ Agregar / Editar</button></label>
         <div class="ac-w">
           <input id="fCategory" type="text" placeholder="Ej: Alimentación, Salud..." oninput="acCatIn(this)" onblur="acCatBlur()" autocomplete="off">
           <div class="ac-list" id="acCatList" style="display:none"></div>
@@ -445,20 +445,6 @@ input:focus,select:focus{border-color:var(--blue)}
     </div>
     <div class="fg"><label>Tipo de gasto</label><div class="tt"><button class="tb fx" id="tbFx" onclick="setType('fixed')">📌 Fijo</button><button class="tb vr on" id="tbVr" onclick="setType('variable')">🔀 Variable</button></div></div>
     <button class="save-btn" id="saveBtn" onclick="guardar()">Guardar gasto</button>
-  </div>
-  <button class="tog-btn" onclick="toggleCfg()" id="togBtn"><span>⚙ Gestionar tarjetas y personas</span><span class="tog-chevron" id="togChv">▼</span></button>
-  <div id="cfgPanel" style="display:none;margin-top:10px">
-    <div class="fc">
-      <div class="fc-ttl" style="font-size:15px;margin-bottom:14px">Tarjetas</div>
-      <div class="cfg-list" id="cfgCards"></div>
-      <div class="add-row"><input id="newCard" type="text" placeholder="Nombre tarjeta..."><input id="newCutoff" type="number" min="1" max="31" placeholder="Día pago" style="max-width:110px"><button class="add-btn" onclick="addCard()">+</button></div>
-      <div style="font-size:11px;color:var(--text3);margin-top:6px">El día de pago es cuando vence tu resumen mensual</div>
-    </div>
-    <div class="fc">
-      <div class="fc-ttl" style="font-size:15px;margin-bottom:14px">Personas</div>
-      <div class="cfg-list" id="cfgPersons"></div>
-      <div class="add-row"><input id="newPerson" type="text" placeholder="Ej: Sofía..."><button class="add-btn" onclick="addPerson()">+</button></div>
-    </div>
   </div>
 </div>
 
@@ -510,11 +496,11 @@ input:focus,select:focus{border-color:var(--blue)}
   <!-- Tarjetas -->
   <div class="fc">
     <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">💳 Tarjetas</div>
-    <div class="cfg-list" id="cfgCards2"></div>
+    <div class="cfg-list" id="cfgCards"></div>
     <div class="add-row">
       <input id="newCard2" type="text" placeholder="Nombre tarjeta...">
       <input id="newCutoff2" type="number" min="1" max="31" placeholder="Día pago" style="max-width:110px">
-      <button class="add-btn" onclick="addCard2()">+</button>
+      <button class="add-btn" onclick="addCard()">+</button>
     </div>
     <div style="font-size:11px;color:var(--text3);margin-top:6px">El día de pago es cuando vence tu resumen mensual</div>
   </div>
@@ -522,10 +508,10 @@ input:focus,select:focus{border-color:var(--blue)}
   <!-- Personas -->
   <div class="fc">
     <div class="fc-ttl" style="font-size:16px;margin-bottom:14px">👤 Personas</div>
-    <div class="cfg-list" id="cfgPersons2"></div>
+    <div class="cfg-list" id="cfgPersons"></div>
     <div class="add-row">
       <input id="newPerson2" type="text" placeholder="Ej: Sofía...">
-      <button class="add-btn" onclick="addPerson2()">+</button>
+      <button class="add-btn" onclick="addPerson()">+</button>
     </div>
   </div>
 
@@ -563,7 +549,7 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.3</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.1.4</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
@@ -898,18 +884,19 @@ function guardar(){
   apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!A:O:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS', {
     values: [row]
   }).then(function(){
+    var needsSave = false;
     // Agregar tienda al Config si es nueva
     if(store && S.stores.indexOf(store) < 0){
       S.stores.push(store);
+      needsSave = true;
     }
     // Agregar categoría al Config si es nueva
     var catVal = document.getElementById('fCategory').value.trim();
     if(catVal && S.categories.indexOf(catVal) < 0){
       S.categories.push(catVal);
+      needsSave = true;
     }
-    if(store && S.stores.indexOf(store) < 0 || catVal && S.categories.indexOf(catVal) < 0){
-      return saveConfig();
-    }
+    if(needsSave) return saveConfig();
   }).then(function(){
     btn.disabled = false; btn.textContent = 'Guardar gasto';
     document.getElementById('fCard').value   = '';
@@ -1125,10 +1112,11 @@ function refreshAll(){
 function renderCfgList(id,arr,fn,extras){
   var el=document.getElementById(id);
   if(!el) return;
+  var isCats  = (fn === removeCat);
   var isCards = (fn === removeCard);
   el.innerHTML=arr.map(function(v,i){
     var extra=extras&&extras[i]?'<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>':'';
-    var editFn = isCards ? 'editCard' : 'editPerson';
+    var editFn = isCats ? 'editCat' : (isCards ? 'editCard' : 'editPerson');
     return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
       +'<div style="display:flex;gap:4px">'
       +'<button class="cfg-edit" onclick="'+editFn+'('+i+')" title="Editar">✏️</button>'
@@ -1158,21 +1146,24 @@ function editPerson(i){
 }
 
 function addCard(){
-  var ni=document.getElementById('newCard'),nc=document.getElementById('newCutoff');
+  var ni=document.getElementById('newCard2'),nc=document.getElementById('newCutoff2');
+  if(!ni) return;
   var v=ni.value.trim(),c=parseInt(nc.value)||'';
   if(!v)return;
   if(S.cards.indexOf(v)>=0){toast('Esa tarjeta ya existe');return;}
   S.cards.push(v);S.cutoffs.push(c);ni.value='';nc.value='';
-  refreshAll();saveConfig();toast('"'+v+'" agregada ✓');
+  refreshAll();renderCfgPage();saveConfig();toast('"'+v+'" agregada ✓');
 }
-function removeCard(i){ var nm=S.cards[i];S.cards.splice(i,1);S.cutoffs.splice(i,1);refreshAll();saveConfig();toast('"'+nm+'" eliminada'); }
+function removeCard(i){ var nm=S.cards[i];S.cards.splice(i,1);S.cutoffs.splice(i,1);refreshAll();renderCfgPage();saveConfig();toast('"'+nm+'" eliminada'); }
 function addPerson(){
-  var ni=document.getElementById('newPerson'),v=ni.value.trim();
+  var ni=document.getElementById('newPerson2');
+  if(!ni) return;
+  var v=ni.value.trim();
   if(!v)return;
   if(S.persons.indexOf(v)>=0){toast('Esa persona ya existe');return;}
-  S.persons.push(v);ni.value='';refreshAll();saveConfig();toast('"'+v+'" agregada ✓');
+  S.persons.push(v);ni.value='';refreshAll();renderCfgPage();saveConfig();toast('"'+v+'" agregada ✓');
 }
-function removePerson(i){ var nm=S.persons[i];S.persons.splice(i,1);refreshAll();saveConfig();toast('"'+nm+'" eliminada'); }
+function removePerson(i){ var nm=S.persons[i];S.persons.splice(i,1);refreshAll();renderCfgPage();saveConfig();toast('"'+nm+'" eliminada'); }
 
 function changeMonth(d){ S.curMonth+=d; if(S.curMonth>12){S.curMonth=1;S.curYear++;} if(S.curMonth<1){S.curMonth=12;S.curYear--;} renderDash();renderStores(); }
 function changeYear(d){ S.annYear+=d; document.getElementById('annYr').textContent=S.annYear; renderAnnual(); }
@@ -1461,9 +1452,9 @@ function toggleFaq(i){
 
 // ── CONFIG PAGE ───────────────────────────────────────────
 function renderCfgPage(){
-  renderCfgList2('cfgCats', S.categories, removeCat, null);
-  renderCfgList2('cfgCards2',S.cards,removeCard2,S.cutoffs);
-  renderCfgList2('cfgPersons2',S.persons,removePerson2,null);
+  renderCfgList('cfgCats', S.categories, removeCat, null);
+  renderCfgList('cfgCards', S.cards, removeCard, S.cutoffs);
+  renderCfgList('cfgPersons', S.persons, removePerson, null);
   // Populate persona selector del sueldo
   var sp=document.getElementById('salaryPerson');
   if(sp){
@@ -1474,51 +1465,9 @@ function renderCfgPage(){
       if(p===S.salaryPerson) o.selected=true;
       sp.appendChild(o);
     });
-    // Default: primera persona
     if(!S.salaryPerson && S.persons.length) sp.value=S.persons[0];
   }
   if(S.salary) document.getElementById('salaryInput').value=S.salary.toFixed(2);
-}
-
-function renderCfgList2(id, arr, fn, extras){
-  var el = document.getElementById(id);
-  if(!el) return;
-  var isCats = (fn === removeCat);
-  var isCards = (fn === removeCard2);
-  el.innerHTML = arr.map(function(v,i){
-    var extra = extras&&extras[i] ? '<span style="font-size:11px;color:var(--text3);margin-left:6px">pago día '+extras[i]+'</span>' : '';
-    var editFn = isCats ? 'editCat' : (isCards ? 'editCard' : 'editPerson');
-    return '<div class="cfg-item"><div><span class="cfg-nm">'+v+'</span>'+extra+'</div>'
-      +'<div style="display:flex;gap:4px">'
-      +'<button class="cfg-edit" onclick="'+editFn+'('+i+')" title="Editar">✏️</button>'
-      +'<button class="cfg-rm" onclick="'+fn.name+'('+i+')" title="Eliminar">×</button>'
-      +'</div></div>';
-  }).join('');
-}
-
-function addCard2(){
-  var ni=document.getElementById('newCard2'), nc=document.getElementById('newCutoff2');
-  var v=ni.value.trim(), c=parseInt(nc.value)||'';
-  if(!v) return;
-  if(S.cards.indexOf(v)>=0){toast('Esa tarjeta ya existe');return;}
-  S.cards.push(v); S.cutoffs.push(c);
-  ni.value=''; nc.value='';
-  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+v+'" agregada ✓');
-}
-function removeCard2(i){
-  var nm=S.cards[i]; S.cards.splice(i,1); S.cutoffs.splice(i,1);
-  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+nm+'" eliminada');
-}
-function addPerson2(){
-  var ni=document.getElementById('newPerson2'), v=ni.value.trim();
-  if(!v) return;
-  if(S.persons.indexOf(v)>=0){toast('Esa persona ya existe');return;}
-  S.persons.push(v); ni.value='';
-  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+v+'" agregada ✓');
-}
-function removePerson2(i){
-  var nm=S.persons[i]; S.persons.splice(i,1);
-  refreshAll(); renderCfgPage(); saveConfig(); toast('"'+nm+'" eliminada');
 }
 
 // ── SUELDO ────────────────────────────────────────────────
