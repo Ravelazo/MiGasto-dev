@@ -288,9 +288,10 @@ input:focus,select:focus{border-color:var(--blue)}
 .del-btn{width:100%;padding:13px;font-size:14px;font-weight:600;border:1.5px solid var(--peach);border-radius:12px;background:var(--surface);color:var(--peach);cursor:pointer;font-family:var(--font);transition:all .15s;margin-top:8px}
 .del-btn:hover{background:var(--peach-bg)}
 /* Status visual in txn list */
-.txn.pagado{opacity:.65}
-.txn.pagado .txn-am{color:var(--text3);text-decoration:line-through}
-.txn.anulado{opacity:.4}
+.txn.pagado{border-left:3px solid var(--green)}
+.txn.pagado .txn-am{color:var(--green)}
+.txn.pagado .txn-ic{background:var(--green-bg)}
+.txn.anulado{opacity:.45}
 .txn.anulado .txn-am{color:var(--text3);text-decoration:line-through}
 .status-ic{font-size:11px;margin-left:4px}
 .ov{position:fixed;inset:0;background:rgba(29,34,51,.5);z-index:500;display:flex;align-items:flex-end;animation:fadeIn .2s}
@@ -1021,7 +1022,7 @@ function saveConfig(){
 }
 
 // ── CARGA INICIAL ────────────────────────────────────────
-function cargarDatos(){
+function cargarDatos(showToast){
   document.getElementById('dTotal').textContent = 'Cargando...';
   getOrCreateSheet()
     .then(function(){ return Promise.all([updateSheetHeaders(), updateConfigHeaders()]); })
@@ -1034,6 +1035,7 @@ function cargarDatos(){
       S.cutoffs    = res[1].cutoffs;
       if(res[1].categories && res[1].categories.length) S.categories = res[1].categories;
       refreshAll();
+      if(showToast) toast('✓ Listo');
     }).catch(function(err){
       toast('Error cargando datos');
       console.error(err);
@@ -1193,7 +1195,19 @@ function refreshAll(){
   bAll.dataset.card='all';bAll.textContent='Todas';
   bAll.addEventListener('click',function(){cf.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});this.classList.add('on');renderDash();});
   cf.appendChild(bAll);
-  S.cards.forEach(function(c){var b=document.createElement('button');b.className='chip'+(c===activeCard?' on':'');b.dataset.card=c;b.textContent=c;b.addEventListener('click',function(){cf.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});this.classList.add('on');renderDash();});cf.appendChild(b);});
+  S.cards.forEach(function(c,ci){
+    var b=document.createElement('button');
+    b.className='chip'+(c===activeCard?' on':'');
+    b.dataset.card=c;
+    var isCredit = S.cutoffs[ci] ? true : false;
+    var typeLabel = '<span style="font-size:10px;color:inherit;opacity:.7;margin-left:3px">'+(isCredit?'crédito':'débito')+'</span>';
+    b.innerHTML = c + typeLabel;
+    b.addEventListener('click',function(){
+      cf.querySelectorAll('.chip').forEach(function(x){x.classList.remove('on');});
+      this.classList.add('on'); renderDash();
+    });
+    cf.appendChild(b);
+  });
   renderCfgList('cfgCards',S.cards,removeCard,S.cutoffs);
   renderCfgList('cfgPersons',S.persons,removePerson,null);
   renderDash();
@@ -1304,19 +1318,41 @@ function renderDash(){
   document.getElementById('fvFVal').textContent=fmt(fx);document.getElementById('fvFPct').textContent=fp+'% del total';document.getElementById('fvFBar').style.width=fp+'%';
   document.getElementById('fvVVal').textContent=fmt(vr);document.getElementById('fvVPct').textContent=vp+'% del total';document.getElementById('fvVBar').style.width=vp+'%';
   // Salary card — requiere persona asignada para funcionar correctamente
-  // Botones de pago por tarjeta
+  // Botones de pago — solo tarjetas de crédito (tienen día de pago)
   var payBtns = document.getElementById('payBtns');
   payBtns.innerHTML = '';
-  S.cards.forEach(function(card){
-    var pend = getExps(m,y,'all').filter(function(e){ return e.card===card && e.status==='pendiente'; });
-    if(!pend.length) return;
-    var tot = pend.reduce(function(s,e){return s+e.amount;},0);
-    var b = document.createElement('button');
-    b.style.cssText = 'flex-shrink:0;padding:7px 14px;border-radius:50px;font-size:13px;font-weight:600;border:1.5px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:var(--font);white-space:nowrap';
-    b.textContent = '💳 Pagar '+card+' · '+fmtS(tot);
-    b.onclick = function(){ pagarTarjeta(card); };
-    payBtns.appendChild(b);
-  });
+  var creditCards = S.cards.filter(function(c,i){ return S.cutoffs[i]; });
+
+  if(cFilter === 'all'){
+    // Chip "Todas" → un solo botón para todas las tarjetas de crédito
+    var allPend = getExps(m,y,'all').filter(function(e){
+      var ci = S.cards.indexOf(e.card);
+      return e.status==='pendiente' && ci>=0 && S.cutoffs[ci];
+    });
+    if(allPend.length){
+      var allTot = allPend.reduce(function(s,e){return s+e.amount;},0);
+      var b = document.createElement('button');
+      b.style.cssText = 'flex-shrink:0;padding:7px 14px;border-radius:50px;font-size:13px;font-weight:600;border:1.5px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:var(--font);white-space:nowrap';
+      b.textContent = '💳 Pagar todas · '+fmtS(allTot);
+      b.onclick = function(){ pagarTodasTarjetas(creditCards); };
+      payBtns.appendChild(b);
+    }
+  } else {
+    // Chip de tarjeta específica → solo si es crédito
+    var ci = S.cards.indexOf(cFilter);
+    var isCredit = ci >= 0 && S.cutoffs[ci];
+    if(isCredit){
+      var pend = getExps(m,y,'all').filter(function(e){ return e.card===cFilter && e.status==='pendiente'; });
+      if(pend.length){
+        var tot = pend.reduce(function(s,e){return s+e.amount;},0);
+        var b = document.createElement('button');
+        b.style.cssText = 'flex-shrink:0;padding:7px 14px;border-radius:50px;font-size:13px;font-weight:600;border:1.5px solid var(--green);background:var(--green-bg);color:var(--green);cursor:pointer;font-family:var(--font);white-space:nowrap';
+        b.textContent = '💳 Pagar '+cFilter+' · '+fmtS(tot);
+        b.onclick = function(){ pagarTarjeta(cFilter); };
+        payBtns.appendChild(b);
+      }
+    }
+  }
 
   var salaryCard=document.getElementById('salaryCard');
   if(S.salary && S.salary > 0 && S.salaryPerson){
@@ -1413,7 +1449,7 @@ function renderTxns(id,exps){
   el.innerHTML=exps.map(function(e){
     var catBadge = e.category ? '<span class="tag" style="background:var(--yellow-bg);color:var(--yellow)">'+e.category+'</span>' : '';
     var statusCls = e.status === 'pagado' ? ' pagado' : e.status === 'anulado' ? ' anulado' : '';
-    var statusIc  = e.status === 'pagado' ? '<span class="status-ic">✅</span>' : e.status === 'anulado' ? '<span class="status-ic">❌</span>' : '';
+    var statusIc  = e.status === 'pagado' ? '<span class="status-ic" style="color:var(--green)">✓</span>' : e.status === 'anulado' ? '<span class="status-ic" style="color:var(--text3)">✕</span>' : '';
     return '<div class="txn'+statusCls+'" onclick="abrirExpEditor(S.expenses.filter(function(x){return x.id==='+e.id+'})[0])" style="cursor:pointer">'
       +'<div class="txn-ic">'+emoji(e.store)+'</div>'
       +'<div class="txn-bd"><div class="txn-nm">'+e.store+statusIc+'</div>'
@@ -1515,11 +1551,10 @@ function closeExpIfOv(e){
 }
 
 function setExpStatus(status, silent){
-  if(!silent) currentExp && (currentExp.status = status);
-  ['pendiente','pagado','anulado'].forEach(function(s){
-    var btn = document.getElementById('sBtn'+s.charAt(0).toUpperCase()+s.slice(1,4));
-    if(btn) btn.classList.toggle('on', s === status);
-  });
+  if(!silent && currentExp) currentExp.status = status;
+  document.getElementById('sBtnPend').classList.toggle('on', status === 'pendiente');
+  document.getElementById('sBtnPag').classList.toggle('on',  status === 'pagado');
+  document.getElementById('sBtnAnu').classList.toggle('on',  status === 'anulado');
 }
 
 function setExpCurrency(c){
@@ -1595,8 +1630,8 @@ function guardarExpEditor(){
     }
     btn.disabled=false; btn.textContent='Guardar cambios';
     cerrarExpEditor();
-    toast('✓ Gasto actualizado');
-    cargarDatos();
+    toast('✓ Actualizando...');
+    cargarDatos(true);
   }).catch(function(){
     btn.disabled=false; btn.textContent='Guardar cambios';
     toast('Error al guardar');
@@ -1617,6 +1652,40 @@ function eliminarGasto(){
 }
 
 // ── BOTÓN PAGO MASIVO POR TARJETA ────────────────────────
+function pagarTodasTarjetas(cards){
+  var m=S.curMonth, y=S.curYear;
+  var pendientes = S.expenses.filter(function(e){
+    var ci = S.cards.indexOf(e.card);
+    return parseInt(e.payMonth)===m && e.payYear===y && e.status==='pendiente' && ci>=0 && S.cutoffs[ci];
+  });
+  if(!pendientes.length){ toast('No hay gastos pendientes'); return; }
+  var total = pendientes.reduce(function(s,e){return s+e.amount;},0);
+  var ov=document.createElement('div'); ov.className='ov';
+  ov.innerHTML='<div class="sheet"><div class="sh-handle"></div>'
+    +'<div style="font-size:17px;font-weight:700;margin-bottom:8px">¿Confirmar pago?</div>'
+    +'<div style="font-size:14px;color:var(--text2);margin-bottom:20px">¿Se pagaron <strong>todas las tarjetas de crédito</strong> por <strong>'+fmt(total)+'</strong>? Se marcarán <strong>'+pendientes.length+' gastos</strong> como pagados.</div>'
+    +'<button class="save-btn" onclick="confirmarPagoMultiple('+JSON.stringify(pendientes.map(function(e){return e.id;}))+',this)">Sí, marcar como pagados</button>'
+    +'<button class="del-btn" style="margin-top:8px" onclick="this.closest(\'.ov\').remove()">Cancelar</button>'
+    +'</div>';
+  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
+  document.body.appendChild(ov);
+}
+
+function confirmarPagoMultiple(ids, btn){
+  btn.disabled=true; btn.textContent='Procesando...';
+  var promises = ids.map(function(id){
+    var rowNum = id+1;
+    return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + '/values/Gastos!M'+rowNum+'?valueInputOption=RAW', {
+      values: [['pagado']]
+    });
+  });
+  Promise.all(promises).then(function(){
+    document.querySelector('.ov').remove();
+    toast('✓ '+ids.length+' gastos marcados como pagados');
+    cargarDatos();
+  }).catch(function(){ toast('Error al actualizar'); });
+}
+
 function pagarTarjeta(card){
   var m=S.curMonth, y=S.curYear;
   var pendientes = S.expenses.filter(function(e){
