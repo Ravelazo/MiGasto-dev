@@ -671,11 +671,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.1</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.2</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.2.1 — OAuth directo + Sheets API
+//  MIGASTO v1.2.2 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1603,6 +1603,11 @@ function renderStores(){
 var currentExp = null; // gasto en edición
 
 function abrirExpEditor(exp){
+  // Si es una cuota agrupada → editor grupal
+  if(exp && exp.groupId && exp.groupId !== ''){
+    abrirEditorCuotasGrupo(exp);
+    return;
+  }
   currentExp = exp;
   // Header
   document.getElementById('expTtl').textContent = emoji(exp.store) + ' ' + exp.store;
@@ -1990,7 +1995,115 @@ function limpiarFormulario(){
   setType('variable');
   setCurrency('PEN');
 }
-function pagarTodasTarjetas(cards){
+// ── EDITOR GRUPAL DE CUOTAS ───────────────────
+function abrirEditorCuotasGrupo(exp){
+  var grupo = S.expenses.filter(function(e){ return e.groupId === exp.groupId; })
+    .sort(function(a,b){ return a.id - b.id; });
+  var n = grupo.length;
+  var primera = grupo[0];
+  var montoTotal = grupo.reduce(function(s,e){ return s+e.amount; }, 0);
+  _popupGasto = exp;
+
+  var msOpts = MN.map(function(m,i){
+    return '<option value="'+String(i+1).padStart(2,'0')+'"'+(String(i+1).padStart(2,'0')===primera.payMonth?' selected':'')+'>'+m+'</option>';
+  }).join('');
+  var yrOpts = '';
+  for(var y=now.getFullYear()-2;y<=now.getFullYear()+3;y++){
+    yrOpts += '<option value="'+y+'"'+(y===primera.payYear?' selected':'')+'>'+y+'</option>';
+  }
+  var sym = exp.currency==='USD' ? '$' : 'S/';
+  var ov = document.createElement('div'); ov.className='ov'; ov.id='popupEditCuotasOv';
+  ov.innerHTML='<div class="sheet"><div class="sh-handle"></div>'
+    +'<div class="sh-title">✏️ Editar serie de cuotas</div>'
+    +'<div class="sh-sub">'+exp.store+' · '+n+' cuotas</div>'
+    +'<div style="background:var(--yellow-bg);border-radius:10px;padding:10px 14px;margin-bottom:16px;font-size:12px;color:var(--yellow)">⚠️ Se anularán las '+n+' cuotas actuales y se crearán nuevas</div>'
+    +'<div class="fg"><label>Monto total</label><div class="amt-w"><span class="amt-pre">'+sym+'</span>'
+    +'<input id="editCuotaTotal" type="text" inputmode="decimal" value="'+montoTotal.toFixed(2)+'" oninput="fmtAmt(this);previewEditCuota()" onblur="finalAmt(this);previewEditCuota()"></div></div>'
+    +'<div class="fg"><label>Número de cuotas</label>'
+    +'<input id="editCuotaN" type="number" min="1" max="60" value="'+n+'" inputmode="numeric" oninput="previewEditCuota()"></div>'
+    +'<div class="row2" style="margin-bottom:14px">'
+    +'<div class="fg" style="margin-bottom:0"><label>Primera cuota</label><select id="editCuotaMes" onchange="previewEditCuota()">'+msOpts+'</select></div>'
+    +'<div class="fg" style="margin-bottom:0"><label>Año</label><select id="editCuotaAnio" onchange="previewEditCuota()">'+yrOpts+'</select></div>'
+    +'</div>'
+    +'<div style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:16px">'
+    +'<div style="font-size:13px;color:var(--text2)">Cuota mensual</div>'
+    +'<div id="editCuotaAmt" style="font-size:22px;font-weight:700;color:var(--blue)">—</div>'
+    +'<div id="editCuotaInfo" style="font-size:11px;color:var(--text3);margin-top:4px"></div>'
+    +'</div>'
+    +'<button class="save-btn" onclick="confirmarEditCuotas(\''+exp.groupId+'\',this)">Guardar cambios</button>'
+    +'<button class="del-btn" style="margin-top:8px" onclick="eliminarGrupoCuotas(\''+exp.groupId+'\',this)">🗑 Eliminar todas las cuotas</button>'
+    +'<button style="width:100%;padding:13px;font-size:14px;border:1.5px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text2);cursor:pointer;font-family:var(--font);margin-top:8px" onclick="document.getElementById(\'popupEditCuotasOv\').remove()">Cancelar</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  previewEditCuota();
+}
+
+function previewEditCuota(){
+  var total = parseFloat((document.getElementById('editCuotaTotal').value||'0').replace(',','.')) || 0;
+  var n     = parseInt(document.getElementById('editCuotaN').value) || 1;
+  var mes   = parseInt(document.getElementById('editCuotaMes').value);
+  var anio  = parseInt(document.getElementById('editCuotaAnio').value);
+  var cuota = total / n;
+  var endD  = new Date(anio, mes-1+n-1, 1);
+  var exp   = _popupGasto;
+  document.getElementById('editCuotaAmt').textContent  = fmt(cuota, exp ? exp.currency : 'PEN');
+  document.getElementById('editCuotaInfo').textContent = 'De '+MN[mes-1]+' '+anio+' a '+MN[endD.getMonth()]+' '+endD.getFullYear();
+}
+
+function confirmarEditCuotas(groupId, btn){
+  var total     = parseFloat((document.getElementById('editCuotaTotal').value||'0').replace(',','.'));
+  var n         = parseInt(document.getElementById('editCuotaN').value);
+  var startMes  = parseInt(document.getElementById('editCuotaMes').value);
+  var startAnio = parseInt(document.getElementById('editCuotaAnio').value);
+  var exp       = _popupGasto;
+  if(!total || n < 1){ toast('⚠️ Completa los campos'); return; }
+  btn.disabled=true; btn.textContent='Guardando...';
+  showUpdating();
+
+  var grupo = S.expenses.filter(function(e){ return e.groupId === groupId; });
+  var anularPromises = grupo.map(function(e){
+    return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId +
+      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['anulado']] });
+  });
+
+  Promise.all(anularPromises).then(function(){
+    var cuota = total / n;
+    var newGroupId = 'cuo_'+Date.now();
+    var promises = [];
+    for(var i=0; i<n; i++){
+      var mes = startMes+i, anio = startAnio;
+      while(mes > 12){ mes -= 12; anio++; }
+      var mesStr = String(mes).padStart(2,'0');
+      promises.push(guardarFilaGasto({
+        card: exp.card, person: exp.person, amount: cuota,
+        store: exp.store, detail: 'Cuota '+(i+1)+' de '+n,
+        month: mesStr, date: anio+'-'+mesStr+'-01',
+        category: exp.category, currency: exp.currency, groupId: newGroupId
+      }, 'cuotas'));
+    }
+    return Promise.all(promises);
+  }).then(function(){
+    document.getElementById('popupEditCuotasOv').remove();
+    _popupGasto = null; hideUpdating();
+    toast('✓ Cuotas actualizadas'); cargarDatos(true);
+  }).catch(function(e){ console.error(e); hideUpdating(); toast('Error al actualizar'); btn.disabled=false; btn.textContent='Guardar cambios'; });
+}
+
+function eliminarGrupoCuotas(groupId, btn){
+  var grupo = S.expenses.filter(function(e){ return e.groupId === groupId; });
+  if(!confirm('¿Eliminar las '+grupo.length+' cuotas de este grupo?')) return;
+  btn.disabled=true; showUpdating();
+  Promise.all(grupo.map(function(e){
+    return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId +
+      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['anulado']] });
+  })).then(function(){
+    document.getElementById('popupEditCuotasOv').remove();
+    _popupGasto=null; hideUpdating();
+    toast('✓ Cuotas eliminadas'); cargarDatos(true);
+  }).catch(function(){ hideUpdating(); toast('Error al eliminar'); });
+}
+
+// ── BOTÓN PAGO MASIVO POR TARJETA ────────────────────────
   var m=S.curMonth, y=S.curYear;
   var pendientes = S.expenses.filter(function(e){
     var ci = S.cards.indexOf(e.card);
