@@ -645,9 +645,10 @@ input:focus,select:focus{border-color:var(--blue)}
       <div class="fg" style="margin-bottom:0"><label>Fecha</label><input id="eDate" type="date"></div>
     </div>
     <div class="fg"><label>Tipo de gasto</label>
-      <div class="tt">
-        <button class="tb fx" id="eTbFx" onclick="setExpType('fixed')">📌 Fijo</button>
-        <button class="tb vr" id="eTbVr" onclick="setExpType('variable')">🔀 Variable</button>
+      <div class="tt" style="grid-template-columns:1fr 1fr 1fr">
+        <button class="tb vr" id="eTbVr"  onclick="setExpType('variable')">🔀 Variable</button>
+        <button class="tb fx" id="eTbFx"  onclick="setExpType('fixed')">📌 Fijo</button>
+        <button class="tb"    id="eTbCuo" onclick="setExpType('cuotas')" style="border-color:var(--lilac)">💳 Cuotas</button>
       </div>
     </div>
 
@@ -671,11 +672,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.2</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.3</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.2.2 — OAuth directo + Sheets API
+//  MIGASTO v1.2.3 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1084,10 +1085,9 @@ function cargarDatos(showToast){
       S.cutoffs    = res[1].cutoffs;
       if(res[1].categories && res[1].categories.length) S.categories = res[1].categories;
       refreshAll();
-      // Generar meses faltantes de gastos fijos
-      generarFijosMissingMonths().then(function(){
-        if(showToast) toast('✓ Listo');
-      });
+      if(showToast) toast('✓ Listo');
+      // Generar meses faltantes de gastos fijos (no bloquea el flujo)
+      setTimeout(function(){ generarFijosMissingMonths(); }, 500);
     }).catch(function(err){
       toast('Error cargando datos');
       console.error(err);
@@ -1660,8 +1660,15 @@ function setExpCurrency(c){
 }
 
 function setExpType(t){
-  document.getElementById('eTbFx').className = 'tb fx' + (t==='fixed'?' on':'');
-  document.getElementById('eTbVr').className = 'tb vr' + (t==='variable'?' on':'');
+  document.getElementById('eTbFx').className  = 'tb fx' + (t==='fixed'   ?' on':'');
+  document.getElementById('eTbVr').className  = 'tb vr' + (t==='variable'?' on':'');
+  var cuo = document.getElementById('eTbCuo');
+  if(cuo){
+    cuo.className = 'tb' + (t==='cuotas'?' on':'');
+    cuo.style.borderColor = t==='cuotas' ? 'var(--lilac)' : '';
+    cuo.style.background  = t==='cuotas' ? 'var(--lilac-bg)' : '';
+    cuo.style.color       = t==='cuotas' ? 'var(--lilac)' : '';
+  }
   currentExp && (currentExp._editType = t);
 }
 
