@@ -654,6 +654,9 @@ input:focus,select:focus{border-color:var(--blue)}
 
     <button class="save-btn" onclick="guardarExpEditor()">Guardar cambios</button>
     <button class="del-btn" onclick="eliminarGasto()">🗑 Eliminar gasto</button>
+    <div id="expCuotasBtn" style="display:none;margin-top:8px">
+      <button style="width:100%;padding:13px;font-size:14px;font-weight:500;border:1.5px solid var(--lilac);border-radius:12px;background:var(--lilac-bg);color:var(--lilac);cursor:pointer;font-family:var(--font)" onclick="abrirEditorCuotasDesdeExp()">✏️ Editar toda la serie de cuotas</button>
+    </div>
   </div>
 </div>
 
@@ -672,11 +675,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.4</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.5</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.2.4 — OAuth directo + Sheets API
+//  MIGASTO v1.2.5 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1610,11 +1613,7 @@ function renderStores(){
 var currentExp = null; // gasto en edición
 
 function abrirExpEditor(exp){
-  // Si es una cuota agrupada → editor grupal
-  if(exp && exp.groupId && exp.groupId !== ''){
-    abrirEditorCuotasGrupo(exp);
-    return;
-  }
+  // Si es una cuota agrupada → editor individual con opción de editar grupo
   currentExp = exp;
   // Header
   document.getElementById('expTtl').textContent = emoji(exp.store) + ' ' + exp.store;
@@ -1639,8 +1638,18 @@ function abrirExpEditor(exp){
   setExpCurrency(exp.currency || 'PEN');
   // Tipo
   setExpType(exp.type || 'variable');
+  // Mostrar botón de editar serie si es cuota
+  var cuotasBtn = document.getElementById('expCuotasBtn');
+  if(cuotasBtn) cuotasBtn.style.display = (exp.groupId && exp.groupId !== '') ? 'block' : 'none';
+
   // Mostrar
   document.getElementById('expOv').style.display = 'flex';
+}
+
+function abrirEditorCuotasDesdeExp(){
+  var exp = currentExp;
+  cerrarExpEditor();
+  if(exp) abrirEditorCuotasGrupo(exp);
 }
 
 function cerrarExpEditor(){
