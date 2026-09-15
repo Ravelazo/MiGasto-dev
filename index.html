@@ -671,11 +671,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.0</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.1</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.2.0 — OAuth directo + Sheets API
+//  MIGASTO v1.2.1 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1747,10 +1747,17 @@ function eliminarGasto(){
 //  GASTOS FIJOS RECURRENTES Y CUOTAS
 // ══════════════════════════════════════════════
 
+// ══════════════════════════════════════════════
+//  GASTOS FIJOS RECURRENTES Y CUOTAS
+// ══════════════════════════════════════════════
+
+var _popupGasto = null; // datos del gasto en el popup actual
+
 // ── POPUP FIJO ────────────────────────────────
 function mostrarPopupFijo(g){
-  var ov = document.createElement('div'); ov.className='ov';
-  var meses = ['','01','02','03','04','05','06','07','08','09','10','11','12'];
+  _popupGasto = g;
+  fijoEndType = 'indefinido';
+  var ov = document.createElement('div'); ov.className='ov'; ov.id='popupFijoOv';
   var msOpts = MN.map(function(m,i){ return '<option value="'+String(i+1).padStart(2,'0')+'">'+m+'</option>'; }).join('');
   var yrOpts = '';
   for(var y=now.getFullYear();y<=now.getFullYear()+10;y++) yrOpts+='<option value="'+y+'">'+y+'</option>';
@@ -1768,10 +1775,9 @@ function mostrarPopupFijo(g){
     +'<div class="fg" style="margin-bottom:0"><label>Mes fin</label><select id="fjMes">'+msOpts+'</select></div>'
     +'<div class="fg" style="margin-bottom:0"><label>Año fin</label><select id="fjAnio">'+yrOpts+'</select></div>'
     +'</div>'
-    +'<button class="save-btn" style="margin-top:16px" onclick="confirmarFijo('+JSON.stringify(g)+',this)">Guardar gasto fijo</button>'
-    +'<button class="del-btn" style="margin-top:8px" onclick="this.closest(\'.ov\').remove()">Cancelar</button>'
+    +'<button class="save-btn" style="margin-top:16px" onclick="confirmarFijo(this)">Guardar gasto fijo</button>'
+    +'<button class="del-btn" style="margin-top:8px" onclick="document.getElementById(\'popupFijoOv\').remove()">Cancelar</button>'
     +'</div>';
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
 }
 
@@ -1783,7 +1789,9 @@ function setFijoEnd(t){
   document.getElementById('fjFechaRow').style.display = t==='fecha' ? 'grid' : 'none';
 }
 
-function confirmarFijo(g, btn){
+function confirmarFijo(btn){
+  var g = _popupGasto;
+  if(!g){ toast('Error: datos perdidos'); return; }
   var endMes = '', endAnio = '';
   if(fijoEndType === 'fecha'){
     endMes  = document.getElementById('fjMes').value;
@@ -1792,25 +1800,23 @@ function confirmarFijo(g, btn){
   btn.disabled=true; btn.textContent='Guardando...';
   showUpdating();
 
-  // 1. Guardar plantilla en hoja Fijos
   var template = [g.store, g.amount, g.card, g.person, g.category||'', g.currency||'PEN',
     g.month, new Date(g.date).getFullYear(), endMes, endAnio, 'activo', g.detail||''];
 
-  // Asegurar que existe la hoja Fijos
   ensureFijosSheet().then(function(){
     return apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId +
       '/values/Fijos!A:L:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS',
       { values: [template] });
   }).then(function(){
-    // 2. Registrar el gasto del mes actual
     return guardarFilaGasto(g, 'fixed');
   }).then(function(){
-    document.querySelector('.ov').remove();
+    document.getElementById('popupFijoOv').remove();
     limpiarFormulario();
+    _popupGasto = null;
     hideUpdating();
     toast('✓ Gasto fijo guardado');
     cargarDatos(true);
-  }).catch(function(){ hideUpdating(); toast('Error al guardar'); });
+  }).catch(function(e){ console.error(e); hideUpdating(); toast('Error al guardar'); btn.disabled=false; btn.textContent='Guardar gasto fijo'; });
 }
 
 function ensureFijosSheet(){
@@ -1818,7 +1824,6 @@ function ensureFijosSheet(){
     .then(function(data){
       var sheets = (data.sheets||[]).map(function(s){return s.properties.title;});
       if(sheets.indexOf('Fijos') >= 0) return Promise.resolve();
-      // Crear la hoja Fijos
       return apiPost('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId + ':batchUpdate', {
         requests: [{ addSheet: { properties: { title: 'Fijos' } } }]
       }).then(function(){
@@ -1845,19 +1850,16 @@ function generarFijosMissingMonths(){
         var endMes=r[8]?String(r[8]).padStart(2,'0'):'', endAnio=parseInt(r[9])||0;
         var detail=r[11]||'';
 
-        // Generar desde mes inicio hasta mes actual
         var cur = new Date(startAnio, parseInt(startMes)-1, 1);
         var limit = new Date(now.getFullYear(), now.getMonth(), 1);
 
         while(cur <= limit){
           var mes  = String(cur.getMonth()+1).padStart(2,'0');
           var anio = cur.getFullYear();
-          // Verificar si ya existe en gastos
           var exists = S.expenses.some(function(e){
             return e.store===store && e.card===card && e.person===person &&
               e.payMonth===mes && e.payYear===anio && e.type==='fixed';
           });
-          // Verificar que no pasó la fecha de fin
           var pastEnd = endMes && endAnio && (anio > endAnio || (anio===endAnio && parseInt(mes) > parseInt(endMes)));
           if(!exists && !pastEnd){
             var g = {card:card,person:person,amount:amount,store:store,
@@ -1868,56 +1870,67 @@ function generarFijosMissingMonths(){
         }
       });
       return Promise.all(promises);
-    }).catch(function(){});
+    }).catch(function(e){ console.error('Fijos:', e); });
 }
 
 // ── POPUP CUOTAS ──────────────────────────────
 function mostrarPopupCuotas(g){
-  var ov = document.createElement('div'); ov.className='ov';
+  _popupGasto = g;
+  var ov = document.createElement('div'); ov.className='ov'; ov.id='popupCuotasOv';
+  var msOpts = MN.map(function(m,i){ return '<option value="'+String(i+1).padStart(2,'0')+'"'+(String(i+1).padStart(2,'0')===g.month?' selected':'')+'>'+m+'</option>'; }).join('');
+  var yrOpts = '';
+  for(var y=now.getFullYear()-1;y<=now.getFullYear()+3;y++) yrOpts+='<option value="'+y+'"'+(y===now.getFullYear()?' selected':'')+'>'+y+'</option>';
+
   ov.innerHTML='<div class="sheet"><div class="sh-handle"></div>'
     +'<div class="sh-title">💳 Pago en Cuotas</div>'
-    +'<div class="sh-sub">'+g.store+'</div>'
+    +'<div class="sh-sub">'+g.store+' · Monto total: '+fmt(g.amount, g.currency)+'</div>'
+    +'<div class="row2" style="margin-bottom:14px">'
+    +'<div class="fg" style="margin-bottom:0"><label>Primera cuota</label><select id="cuotaMesInicio">'+msOpts+'</select></div>'
+    +'<div class="fg" style="margin-bottom:0"><label>Año</label><select id="cuotaAnioInicio">'+yrOpts+'</select></div>'
+    +'</div>'
     +'<div class="fg"><label>Número de cuotas</label>'
-    +'<input id="cuotaN" type="number" min="2" max="60" placeholder="Ej: 12" inputmode="numeric" oninput="previewCuota('+JSON.stringify(g)+')">'
+    +'<input id="cuotaN" type="number" min="2" max="60" placeholder="Ej: 12" inputmode="numeric" oninput="previewCuota()">'
     +'</div>'
     +'<div id="cuotaPreview" style="background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:none">'
     +'<div style="font-size:13px;color:var(--text2)">Cuota mensual</div>'
     +'<div id="cuotaAmt" style="font-size:22px;font-weight:700;color:var(--blue)">—</div>'
     +'<div id="cuotaInfo" style="font-size:11px;color:var(--text3);margin-top:4px"></div>'
     +'</div>'
-    +'<button class="save-btn" id="cuotaBtn" onclick="confirmarCuotas('+JSON.stringify(g)+',this)" disabled>Registrar cuotas</button>'
-    +'<button class="del-btn" style="margin-top:8px" onclick="this.closest(\'.ov\').remove()">Cancelar</button>'
+    +'<button class="save-btn" id="cuotaBtn" onclick="confirmarCuotas(this)" disabled>Registrar cuotas</button>'
+    +'<button class="del-btn" style="margin-top:8px" onclick="document.getElementById(\'popupCuotasOv\').remove()">Cancelar</button>'
     +'</div>';
-  ov.addEventListener('click',function(e){if(e.target===ov)ov.remove();});
   document.body.appendChild(ov);
 }
 
-function previewCuota(g){
+function previewCuota(){
+  var g = _popupGasto;
+  if(!g) return;
   var n = parseInt(document.getElementById('cuotaN').value)||0;
   var prev = document.getElementById('cuotaPreview');
   var confirmBtn = document.getElementById('cuotaBtn');
   if(n < 2){ prev.style.display='none'; confirmBtn.disabled=true; return; }
   var cuota = g.amount / n;
-  document.getElementById('cuotaAmt').textContent = fmt(cuota, g.currency);
-  // Calcular meses
-  var startMes = parseInt(g.month);
-  var startAnio = new Date(g.date).getFullYear();
+  var startMes  = parseInt(document.getElementById('cuotaMesInicio').value);
+  var startAnio = parseInt(document.getElementById('cuotaAnioInicio').value);
   var endD = new Date(startAnio, startMes-1+n-1, 1);
+  document.getElementById('cuotaAmt').textContent = fmt(cuota, g.currency);
   document.getElementById('cuotaInfo').textContent =
     'De '+MN[startMes-1]+' '+startAnio+' a '+MN[endD.getMonth()]+' '+endD.getFullYear();
   prev.style.display='block';
   confirmBtn.disabled=false;
 }
 
-function confirmarCuotas(g, btn){
+function confirmarCuotas(btn){
+  var g = _popupGasto;
+  if(!g){ toast('Error: datos perdidos'); return; }
   var n = parseInt(document.getElementById('cuotaN').value)||0;
   if(n < 2){ toast('Ingresa al menos 2 cuotas'); return; }
+  var startMes  = parseInt(document.getElementById('cuotaMesInicio').value);
+  var startAnio = parseInt(document.getElementById('cuotaAnioInicio').value);
   btn.disabled=true; btn.textContent='Registrando...';
   showUpdating();
 
   var cuota = g.amount / n;
-  var startMes = parseInt(g.month);
-  var startAnio = new Date(g.date).getFullYear();
   var groupId = 'cuo_'+Date.now();
   var promises = [];
 
@@ -1928,20 +1941,23 @@ function confirmarCuotas(g, btn){
     var mesStr = String(mes).padStart(2,'0');
     var gc = {
       card: g.card, person: g.person, amount: cuota,
-      store: g.store, detail: 'Cuota '+(i+1)+' de '+n+(g.detail?' · '+g.detail:''),
-      month: mesStr, date: anio+'-'+mesStr+'-01',
+      store: g.store,
+      detail: 'Cuota '+(i+1)+' de '+n+(g.detail?' · '+g.detail:''),
+      month: mesStr,
+      date: anio+'-'+mesStr+'-01',
       category: g.category, currency: g.currency, groupId: groupId
     };
     promises.push(guardarFilaGasto(gc,'cuotas'));
   }
 
   Promise.all(promises).then(function(){
-    document.querySelector('.ov').remove();
+    document.getElementById('popupCuotasOv').remove();
     limpiarFormulario();
+    _popupGasto = null;
     hideUpdating();
     toast('✓ '+n+' cuotas registradas');
     cargarDatos(true);
-  }).catch(function(){ hideUpdating(); toast('Error al guardar'); });
+  }).catch(function(e){ console.error(e); hideUpdating(); toast('Error al guardar'); btn.disabled=false; btn.textContent='Registrar cuotas'; });
 }
 
 // ── HELPER: guardar una fila en Gastos ────────
