@@ -675,11 +675,11 @@ input:focus,select:focus{border-color:var(--blue)}
 </div>
 
 <div class="toast" id="toastEl"></div>
-<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.5</div>
+<div style="position:fixed;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--text3);z-index:100;pointer-events:none">v1.2.6</div>
 
 <script>
 // ═══════════════════════════════════════════════════════
-//  MIGASTO v1.2.5 — OAuth directo + Sheets API
+//  MIGASTO v1.2.6 — OAuth directo + Sheets API
 // ═══════════════════════════════════════════════════════
 
 // ── UTILS (definen primero para que estén disponibles en todo el script) ──
@@ -1377,7 +1377,7 @@ function goPage(id){
 function toggleCfg(){ var p=document.getElementById('cfgPanel'),c=document.getElementById('togChv'),b=document.getElementById('togBtn'),open=p.style.display==='none';p.style.display=open?'block':'none';c.style.transform=open?'rotate(180deg)':'';b.style.background=open?'var(--surface2)':'var(--surface)'; }
 function abrirSheet(){ if(S.sheetUrl) window.open(S.sheetUrl,'_blank'); else toast('Carga tus datos primero'); }
 
-function getExps(m,y,card){ return S.expenses.filter(function(e){return parseInt(e.payMonth)===m&&e.payYear===y&&(!card||card==='all'||e.card===card)&&e.status!=='anulado';}); }
+function getExps(m,y,card){ return S.expenses.filter(function(e){return parseInt(e.payMonth)===m&&e.payYear===y&&(!card||card==='all'||e.card===card)&&e.status!=='anulado'&&e.status!=='eliminado';}); }
 function getRange(months,refM,refY){ var out=[]; for(var i=0;i<months;i++){var m=refM-i,y=refY;if(m<1){m+=12;y--;}S.expenses.filter(function(e){return parseInt(e.payMonth)===m&&e.payYear===y;}).forEach(function(e){out.push(e);});} return out; }
 
 function renderDash(){
@@ -1470,7 +1470,9 @@ function renderDash(){
   var byPers={};exps.forEach(function(e){byPers[e.person]=(byPers[e.person]||0)+e.amount;});
   renderDonut('svgPers','dlPers','dnPers',byPers,String(Object.keys(byPers).length));
   renderTxns('dTxns', S.expenses.filter(function(e){
-    return parseInt(e.payMonth)===m && e.payYear===y && (!cFilter||cFilter==='all'||e.card===cFilter);
+    return parseInt(e.payMonth)===m && e.payYear===y &&
+      (!cFilter||cFilter==='all'||e.card===cFilter) &&
+      e.status !== 'eliminado';
   }).slice().sort(function(a,b){
     var da = a.dateFull || a.date || '';
     var db = b.dateFull || b.date || '';
@@ -2086,7 +2088,7 @@ function confirmarEditCuotas(groupId, btn){
   var grupo = S.expenses.filter(function(e){ return e.groupId === groupId; });
   var anularPromises = grupo.map(function(e){
     return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId +
-      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['anulado']] });
+      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['eliminado']] });
   });
 
   Promise.all(anularPromises).then(function(){
@@ -2118,7 +2120,7 @@ function eliminarGrupoCuotas(groupId, btn){
   btn.disabled=true; showUpdating();
   Promise.all(grupo.map(function(e){
     return apiPut('https://sheets.googleapis.com/v4/spreadsheets/' + S.sheetId +
-      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['anulado']] });
+      '/values/Gastos!M'+(e.id+1)+'?valueInputOption=RAW', { values: [['eliminado']] });
   })).then(function(){
     document.getElementById('popupEditCuotasOv').remove();
     _popupGasto=null; hideUpdating();
