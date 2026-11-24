@@ -1738,7 +1738,7 @@ function applyUSDSetting(enabled){
 }
 function saveFx(el){
   var v = parseAmount(el.value);
-  if(!(v > 0)){ toast('Ingresa un tipo de cambio válido'); el.value = (S.fx||3.75).toFixed(2); return; }
+  if(!(v >= 1.5 && v <= 10)){ toast('Tipo de cambio fuera de rango (ej: 3.75). Revisa el punto decimal'); el.value = (S.fx||3.75).toFixed(2); return; }
   S.fx = v; el.value = v.toFixed(2);
   saveSettings(); refreshAll();
   toast('✓ Tipo de cambio guardado');
