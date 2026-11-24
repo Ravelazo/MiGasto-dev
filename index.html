@@ -595,7 +595,8 @@ input:focus,select:focus{border-color:var(--blue)}
       <div class="fg" style="margin-bottom:6px"><label>Tipo de cambio (S/ por 1 US$)</label>
         <input id="fxInput" type="text" inputmode="decimal" placeholder="3.45" oninput="fmtAmt(this)" onchange="saveFx(this)">
       </div>
-      <div class="hint">Se usa para sumar tus gastos en dólares dentro de los totales en soles. Aplica a todo el historial.</div>
+      <div class="hint">Se usa para sumar tus gastos en dólares dentro de los totales en soles. Aplica a todo el historial: si lo cambias, se recalculan todos los meses. Cada cambio queda registrado con su fecha.</div>
+      <div id="fxLog" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -904,7 +905,7 @@ var S = {
   sheetUrl: null, sheetId: null,
   accessToken: null, userEmail: null, userName: null,
   salary: 0, salaryPerson: '',
-  usdEnabled: false, fx: 3.45,
+  usdEnabled: false, fx: 3.45, fxLog: [],
   tokenExpiry: 0, lastLoad: 0, sheetChecked: false,
   categories: ['Alimentación','Transporte','Entretenimiento','Salud','Hogar','Ropa','Educación','Otros']
 };
@@ -1234,19 +1235,24 @@ function readGastos(){
 }
 
 function readConfig(){
-  return apiGet(shUrl('/values/Config!A2:H'))
+  return apiGet(shUrl('/values/Config!A2:L'))
     .then(function(data){
       var rows = data.values || [];
       var withCard = rows.filter(function(r){ return r[0]; });
       var settings = {};
       rows.forEach(function(r){ if(r[6]) settings[String(r[6]).trim()] = r[7]; });
+      // Historial de cambios del tipo de cambio (Config J:L = fecha, nuevo, anterior)
+      var fxLog = rows.filter(function(r){ return r[9] && parseAmount(r[10]) > 0; }).map(function(r){
+        return {date: String(r[9]), fx: parseAmount(r[10]), prev: parseAmount(r[11]) || 0};
+      });
       return {
         cards:      withCard.map(function(r){ return String(r[0]).trim(); }),
         persons:    rows.map(function(r){ return r[1]; }).filter(Boolean).map(function(x){ return String(x).trim(); }),
         stores:     rows.map(function(r){ return r[2]; }).filter(Boolean).map(function(x){ return String(x).trim(); }),
         cutoffs:    withCard.map(function(r){ return r[3] || ''; }),
         categories: rows.map(function(r){ return r[4]; }).filter(Boolean).map(function(x){ return String(x).trim(); }),
-        settings:   settings
+        settings:   settings,
+        fxLog:      fxLog
       };
     });
 }
@@ -1600,6 +1606,8 @@ function cargarDatos(showToast, silent, isRetry){
       S.cutoffs    = res[1].cutoffs;
       if(res[1].categories && res[1].categories.length) S.categories = res[1].categories;
       applySheetSettings(res[1].settings);
+      S.fxLog = res[1].fxLog || [];
+      renderFxLog();
       S.lastLoad = Date.now();
       refreshAll();
       if(showToast) toast('✓ Listo');
@@ -1739,9 +1747,34 @@ function applyUSDSetting(enabled){
 function saveFx(el){
   var v = parseAmount(el.value);
   if(!(v >= 1.5 && v <= 10)){ toast('Tipo de cambio fuera de rango (ej: 3.45). Revisa el punto decimal'); el.value = (S.fx||3.45).toFixed(2); return; }
+  v = Math.round(v * 10000) / 10000;
+  if(v === S.fx){ el.value = v.toFixed(2); return; }
+  var prev = S.fx;
   S.fx = v; el.value = v.toFixed(2);
-  saveSettings(); refreshAll();
-  toast('✓ Tipo de cambio guardado');
+  S.fxLog.push({date: composeStamp(todayLocal()), fx: v, prev: prev});
+  saveSettings(); saveFxLog(); renderFxLog(); refreshAll();
+  toast('✓ Tipo de cambio guardado (queda en el historial)');
+}
+// Cada cambio queda registrado en el Sheet (hoja Config, columnas J:L) con su fecha y hora
+function saveFxLog(){
+  if(!S.sheetId) return Promise.resolve();
+  var vals = [['Cambio de tipo de cambio (fecha)', 'Nuevo', 'Anterior']];
+  S.fxLog.forEach(function(e){ vals.push([e.date, e.fx, e.prev || '']); });
+  return apiPut(shUrl('/values/Config!J1:L' + vals.length + '?valueInputOption=RAW'), {values: vals})
+    .catch(function(e){ console.warn('No se pudo guardar el historial del tipo de cambio:', e); toast('⚠ El cambio se aplicó, pero no se pudo guardar en el historial. Revisa tu conexión.'); });
+}
+function renderFxLog(showAll){
+  var el = document.getElementById('fxLog'); if(!el) return;
+  var log = (S.fxLog || []).slice().reverse();
+  if(!log.length){ el.innerHTML = '<div class="hint">Aún no has cambiado el tipo de cambio. Cada cambio quedará registrado aquí con su fecha.</div>'; return; }
+  var shown = showAll ? log : log.slice(0, 4);
+  el.innerHTML = '<div style="font-size:12px;font-weight:600;color:var(--text2);margin:2px 0 4px">Historial de cambios</div>' +
+    shown.map(function(e){
+      return '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-top:1px solid var(--border)">' +
+        '<span style="color:var(--text2)">' + esc(e.date.slice(0,16)) + '</span>' +
+        '<span><b>' + e.fx.toFixed(2) + '</b>' + (e.prev ? ' <span style="color:var(--text3)">(antes ' + e.prev.toFixed(2) + ')</span>' : '') + '</span></div>';
+    }).join('') +
+    (log.length > 4 ? '<button type="button" onclick="renderFxLog(' + (showAll ? 'false' : 'true') + ')" style="background:none;border:0;color:var(--blue);font-size:12px;padding:6px 0;cursor:pointer">' + (showAll ? 'Ver menos' : 'Ver todo (' + log.length + ')') + '</button>' : '');
 }
 
 // ── MONEDA ────────────────────────────────────────────────
