@@ -593,7 +593,7 @@ input:focus,select:focus{border-color:var(--blue)}
     </div>
     <div id="fxRow" style="display:none;padding-top:6px">
       <div class="fg" style="margin-bottom:6px"><label>Tipo de cambio (S/ por 1 US$)</label>
-        <input id="fxInput" type="text" inputmode="decimal" placeholder="3.75" oninput="fmtAmt(this)" onchange="saveFx(this)">
+        <input id="fxInput" type="text" inputmode="decimal" placeholder="3.45" oninput="fmtAmt(this)" onchange="saveFx(this)">
       </div>
       <div class="hint">Se usa para sumar tus gastos en dólares dentro de los totales en soles. Aplica a todo el historial.</div>
     </div>
@@ -904,7 +904,7 @@ var S = {
   sheetUrl: null, sheetId: null,
   accessToken: null, userEmail: null, userName: null,
   salary: 0, salaryPerson: '',
-  usdEnabled: false, fx: 3.75,
+  usdEnabled: false, fx: 3.45,
   tokenExpiry: 0, lastLoad: 0, sheetChecked: false,
   categories: ['Alimentación','Transporte','Entretenimiento','Salud','Hogar','Ropa','Educación','Otros']
 };
@@ -1290,7 +1290,7 @@ function saveSettings(){
 function applySheetSettings(map){
   if(!map || !Object.keys(map).length){
     // Primera vez con esta versión: sube lo que ya tenías en este dispositivo
-    if(S.usdEnabled || S.salary > 0 || S.fx !== 3.75) saveSettings();
+    if(S.usdEnabled || S.salary > 0 || S.fx !== 3.45) saveSettings();
     return;
   }
   if(map.usd != null) S.usdEnabled = String(map.usd) === '1';
@@ -1302,7 +1302,7 @@ function applySheetSettings(map){
 }
 
 // ── MONEDA: todo total se calcula en soles ──
-function amtPEN(e){ return e.currency === 'USD' ? e.amount * (S.fx || 3.75) : e.amount; }
+function amtPEN(e){ return e.currency === 'USD' ? e.amount * (S.fx || 3.45) : e.amount; }
 function sumPEN(list){ return list.reduce(function(s,e){ return s + amtPEN(e); }, 0); }
 
 // ── GUARDAR GASTO ────────────────────────────────────────
@@ -1733,12 +1733,12 @@ function applyUSDSetting(enabled){
   var fxRow = document.getElementById('fxRow');
   if(fxRow) fxRow.style.display = enabled ? 'block' : 'none';
   var fxIn = document.getElementById('fxInput');
-  if(fxIn && document.activeElement !== fxIn) fxIn.value = (S.fx || 3.75).toFixed(2);
+  if(fxIn && document.activeElement !== fxIn) fxIn.value = (S.fx || 3.45).toFixed(2);
   if(!enabled) setCurrency('PEN');
 }
 function saveFx(el){
   var v = parseAmount(el.value);
-  if(!(v >= 1.5 && v <= 10)){ toast('Tipo de cambio fuera de rango (ej: 3.75). Revisa el punto decimal'); el.value = (S.fx||3.75).toFixed(2); return; }
+  if(!(v >= 1.5 && v <= 10)){ toast('Tipo de cambio fuera de rango (ej: 3.45). Revisa el punto decimal'); el.value = (S.fx||3.45).toFixed(2); return; }
   S.fx = v; el.value = v.toFixed(2);
   saveSettings(); refreshAll();
   toast('✓ Tipo de cambio guardado');
